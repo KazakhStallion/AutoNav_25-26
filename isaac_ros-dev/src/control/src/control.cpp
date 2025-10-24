@@ -157,12 +157,12 @@ class ControlNode : public rclcpp::Node {
                 motors.move(command.right_motor_speed * motors.getSpeed(), command.left_motor_speed * motors.getSpeed());
             }
             else if(command.cmd == Xbox::SPEED_DOWN){
-                motors.setSpeed(motors.getSpeed() - 1);
+                motors.setSpeed(motors.getSpeed() - 5);
                 RCLCPP_INFO(this->get_logger(), "speed down. new speed: %d", motors.getSpeed());
 
             }
             else if(command.cmd == Xbox::SPEED_UP){
-                motors.setSpeed(motors.getSpeed() + 1);
+                motors.setSpeed(motors.getSpeed() + 5);
                 RCLCPP_INFO(this->get_logger(), "speed up! new speed: %d", motors.getSpeed());
             }
             else if(command.cmd == Xbox::STOP){
