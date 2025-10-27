@@ -3,7 +3,7 @@ import os
 import subprocess
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QDialog, QMessageBox
+    QPushButton, QLabel, QDialog, QMessageBox, QScrollArea, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -15,9 +15,83 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 # from launch.substitutions import PathJoinSubstitution
 
 TESTS = [
-    {"name": "Test 1", "launch_file": "test1.launch.py"},
-    {"name": "Test 2", "launch_file": "test2.launch.py"},
-    {"name": "Test 3", "launch_file": "test3.launch.py"},
+    {
+        "id": "[Test ID: 001]",
+        "title": "GPS Calibration Test",
+        "launch_file": "t001_GPS_Cal.launch.py",
+        "desc": "Prerequisites:\nEnsure a flat, wide 6[m]x6[m] open outdoor area for this test to be executed.\n\nTest Description:\nSets a triangle of GPS waypoints around the robot and the robot will automatically drive to them in sequence.",
+        "image": "t001.jpg",
+    },
+    {
+        "id": "[Test ID: 002]",
+        "title": "Line Compliance Test",
+        "launch_file": "t002_Line_Comp.launch.py",
+        "desc": "Prerequisites:\nEnsure a flat, straight 30[m] long line-only test course is in front of the robot for this test to be executed.\n\nTest Description:\nRobot will move forward and will attempt to maintain position between the white lines.",
+        "image": "t002.jpg",
+    },
+    {
+        "id": "[Test ID: 003]",
+        "title": "Forward Movement Test",
+        "launch_file": "t003_Forward_Move.launch.py",
+        "desc": "Prerequisites:\nEnsure a flat, short but windy test course for the robot for this test to be executed.\n\nTest Description:\nRobot will attempt to move through the winds without turning around.",
+        "image": "t003.jpg",
+    },
+    {
+        "id": "[Test ID: 004]",
+        "title": "Object Detection Test",
+        "launch_file": "t004_Obj_Detect.launch.py",
+        "desc": "Prerequisites:\nEnsure objects are in front of the robot camera and there is sufficient space this test to be executed.\n\nTest Description:\nImages of detection rectangles overlay will be exported and the robot will navigate around the objects.",
+        "image": "t004.jpg",
+    },
+    {
+        "id": "[Test ID: 005]",
+        "title": "Path Planning Test",
+        "launch_file": "t005_Path_Plan.launch.py",
+        "desc": "Prerequisites:\nEnsure objects are in front of the robot camera and there is sufficient space for this test to be executed.\n\nTest Description:\nImages of path planning will be exported and the robot will choose a path to move along.",
+        "image": "t005.jpg",
+    },
+    {
+        "id": "[Test ID: 006]",
+        "title": "Simulation Test",
+        "launch_file": "t006_Simulation.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
+    {
+        "id": "[Test ID: 007]",
+        "title": "Speed Test",
+        "launch_file": "t007_Speed.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
+    {
+        "id": "[Test ID: 008]",
+        "title": "Acceleration Test",
+        "launch_file": "t008_Acceleration.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
+    {
+        "id": "[Test ID: 009]",
+        "title": "Rotation Test",
+        "launch_file": "t009_Rotation.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
+    {
+        "id": "[Test ID: 010]",
+        "title": "Steering Drift Test",
+        "launch_file": "t010_Steering_Drift.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
+    {
+        "id": "[Test ID: 011]",
+        "title": "Incline Performance Test",
+        "launch_file": "t011_Incline_Performance.launch.py",
+        "desc": "Prerequisites:\nTBD.\n\nTest Description:\nTBD.",
+        "image": None,
+    },
 ]
 
 PACKAGE_NAME = "autonav_automated_testing"
@@ -133,18 +207,120 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         central = QWidget()
-        layout = QVBoxLayout()
-        label = QLabel("Select a test to run:")
-        layout.addWidget(label)
+
+        outer_layout = QVBoxLayout()
+        header = QLabel("Select a test to run:")
+        header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        outer_layout.addWidget(header)
+
+        # Scroll area to contain many tests
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+
+        content = QWidget()
+        content_layout = QVBoxLayout()
+        content.setLayout(content_layout)
+
+        # Create a row for each test inside the scrollable content: [ID label] [Run button] [Description] [Image 100x100]
         for test in TESTS:
-            btn = QPushButton(test["name"])
+            row = QHBoxLayout()
+            row.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Align all items vertically center
+
+            # ID label on the left
+            id_label = QLabel(test.get("id", ""))
+            id_label.setFixedWidth(120)
+            id_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(id_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+            # Run button (title shown)
+            btn = QPushButton(test["title"])
             btn.clicked.connect(lambda checked, t=test: self.open_test_dialog(t))
-            layout.addWidget(btn)
+            btn.setFixedWidth(200)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    border: 1px solid #cccccc;
+                    padding: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #f5f5f5;
+                }
+            """)
+            row.addWidget(btn, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+            # Description (expandable)
+            desc_label = QLabel(test.get("desc", ""))
+            desc_label.setWordWrap(True)
+            desc_label.setStyleSheet("""
+                color: #333333;
+                padding: 4px;
+                background-color: transparent;
+            """)
+            desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            desc_label.setMinimumHeight(100)  # Match image height
+            desc_label.adjustSize()
+            row.addWidget(desc_label, stretch=1, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+            # Image placeholder to the right (100x100)
+            img_label = QLabel()
+            img_label.setFixedSize(100, 100)
+            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            img_label.setStyleSheet("""
+                background-color: #e0e0e0;
+                border: 1px solid #a0a0a0;
+                min-width: 100px;
+                min-height: 100px;
+                max-width: 100px;
+                max-height: 100px;
+            """)
+            img_path = test.get("image")
+            if img_path and os.path.exists(img_path):
+                from PyQt6.QtGui import QPixmap
+                pix = QPixmap(img_path)
+                if not pix.isNull():
+                    # Force exact 100x100 size without keeping aspect ratio
+                    img_label.setPixmap(pix.scaled(100, 100, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                else:
+                    img_label.setText("No Image")
+            else:
+                img_label.setText("No Image")
+
+            # Ensure image is vertically centered in the row
+            row.addWidget(img_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+            # wrap row in a container widget to preserve spacing and allow styling if needed
+            row_widget = QWidget()
+            # Add border and padding around the row, keeping image size exact
+            row_widget.setStyleSheet("""
+                margin: 8px 0;
+                padding: 8px;
+                min-height: 100px;
+                border: 1px solid #e0e0e0;
+                border-radius: 2px;
+            """)
+            row_widget.setLayout(row)
+            # Set size policy to ensure the widget can expand but maintains minimum height
+            row_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
+            content_layout.addWidget(row_widget)
+
+        # Add stretch so content groups to top
+        content_layout.addStretch()
+
+        scroll.setWidget(content)
+        outer_layout.addWidget(scroll)
+
+        # Spacer and Close button (outside scroll area so always visible)
+        close_row = QHBoxLayout()
+        close_row.addStretch()
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.close)
-        layout.addWidget(close_btn)
-        central.setLayout(layout)
+        close_row.addWidget(close_btn)
+        outer_layout.addLayout(close_row)
+
+        central.setLayout(outer_layout)
         self.setCentralWidget(central)
+        # Make window a bit larger to accommodate descriptions and images
+        self.resize(1200, 600)
 
     def open_test_dialog(self, test):
         launch_file_path = get_launch_file_path(test["launch_file"])
