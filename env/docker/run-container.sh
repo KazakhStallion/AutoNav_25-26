@@ -6,7 +6,7 @@ set -e # makes script exit on command failure
 
 IMAGE_TAG="dev:koopa-kingdom"
 CONTAINER_NAME="koopa-kingdom"
-WORKDIR="$HOME/AutoNav/"
+WORKDIR="$HOME/AutoNav_25-26/"
 ENTRYPOINT="/usr/local/bin/scripts/entrypoint.sh"
 SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
 

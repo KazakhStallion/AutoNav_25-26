@@ -12,7 +12,7 @@ if docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" > /dev/null 2>&1; then
 fi
 
 
-docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" "$HOME/AutoNav/env/docker/dockerfiles" 
+docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" "$HOME/AutoNav_25-26/env/docker/dockerfiles" 
 
 
 
