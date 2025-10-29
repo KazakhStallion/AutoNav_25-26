@@ -355,12 +355,7 @@ def run_test(args: argparse.Namespace) -> None:
 
 def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Encoder speed logging test")
-    parser.add_argument(
-        "port",
-        type=Path,
-        default=Path("/dev/ttyACM0"),
-        help="Serial port connected to the motor controller",
-    )
+    parser.add_argument("port", help="Serial port connected to the motor controller")
     parser.add_argument(
         "--speed-mph",
         type=float,
