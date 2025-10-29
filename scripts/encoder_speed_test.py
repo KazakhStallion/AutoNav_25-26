@@ -114,12 +114,15 @@ def read_encoder_count(ser: serial.Serial, channel: int) -> int:
     """Query the encoder count for the requested channel."""
 
     command = f"?C {channel}\r".encode("ascii")
+    print(f"Sending command: {command}")  # Test
     ser.reset_input_buffer()
     ser.write(command)
 
     deadline = time.time() + (ser.timeout or 0.2) * 3
+    print(f"Waiting for response until {deadline:.3f}") # Test
     while time.time() < deadline:
         response = ser.readline().decode("ascii", errors="ignore").strip()
+        print(f"Received response: {response}")  # Test
         if not response:
             continue
 
@@ -175,7 +178,9 @@ def collect_samples(
 
     try:
         initial_left = left_prev = read_encoder_count(ser, left_channel)
+        print(f"Initial left encoder count: {initial_left}")  # Test
         initial_right = right_prev = read_encoder_count(ser, right_channel)
+        print(f"Initial right encoder count: {initial_right}")  # Test
         start_time = time.perf_counter()
         last_sample_time = start_time
         next_sample_time = start_time + sample_interval_s
@@ -183,6 +188,7 @@ def collect_samples(
         while True:
             now = time.perf_counter()
             elapsed = now - start_time
+            print(f"Elapsed time: {elapsed:.3f}s")  # Test
             if elapsed >= duration_s:
                 break
 
@@ -193,7 +199,9 @@ def collect_samples(
 
             sample_time = time.perf_counter()
             left_current = read_encoder_count(ser, left_channel)
+            print(f"Sampled left encoder count: {left_current}")  # Test
             right_current = read_encoder_count(ser, right_channel)
+            print(f"Sampled right encoder count: {right_current}")  # Test
 
             dt = sample_time - last_sample_time
             left_delta = left_current - (left_prev or left_current)
@@ -203,6 +211,10 @@ def collect_samples(
             # encoder counts use opposite conventions for each wheel.
             avg_delta = (abs(left_delta) + abs(right_delta)) / 2.0
             mph = counts_to_mph(avg_delta, dt)
+            print(
+                f"Sampled deltas: left={left_delta} right={right_delta} "
+                f"average_mph={mph:.3f}"
+            ) # Test
 
             samples.append(
                 Sample(
@@ -220,7 +232,9 @@ def collect_samples(
             last_sample_time = sample_time
 
         final_left = read_encoder_count(ser, left_channel)
-        final_right = read_encoder_count(ser, right_channel)
+        print(f"Final left encoder count: {final_left}")
+        final_right = read_encoder_count(ser, right_channel)    # Test
+        print(f"Final right encoder count: {final_right}")  # Test
 
         return samples, initial_left, initial_right, final_left, final_right
     except RuntimeError as exc:
@@ -398,8 +412,8 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser.add_argument(
         "--log-file",
         type=Path,
-        default=Path("encoder_speed_test.log"),
-        help="Where to write the output log (default: encoder_speed_test.log)",
+        default=Path("~/logs/encoder_speed_test.log"),
+        help="Where to write the output log (default: /logs/encoder_speed_test.log)",
     )
 
     return parser.parse_args(list(argv))
