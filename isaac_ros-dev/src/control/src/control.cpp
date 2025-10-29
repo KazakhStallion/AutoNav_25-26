@@ -136,10 +136,12 @@ class ControlNode : public rclcpp::Node {
 
     void publish_encoder_data() {
         autonav_interfaces::msg::Encoders encoder_msg;
-        encoder_msg.left_motor_rpm = 0;
-        encoder_msg.right_motor_rpm = 0;
+        encoder_msg.left_motor_rpm = motors.getLeftRPM();
+        encoder_msg.right_motor_rpm = motors.getRightRPM();
         encoder_msg.left_motor_count = motors.getLeftEncoderCount();
         encoder_msg.right_motor_count = motors.getRightEncoderCount();
+        encoder_msg.left_motor_mph = (encoder_msg.left_motor_rpm * 2.0 * 3.14159 * 0.205 * 2.236936);
+        encoder_msg.right_motor_mph = (encoder_msg.right_motor_rpm * 2.0 * 3.14159 * 0.205 * 2.236936);
         //RCLCPP_INFO(this->get_logger(), "LEC: %s", motors.getLeftEncoderCount());
 
 
