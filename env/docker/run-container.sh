@@ -4,7 +4,7 @@ set -e # makes script exit on command failure
 
 # set params
 
-IMAGE_TAG="autonav:koopa-kingdom"
+IMAGE_TAG="dev:koopa-kingdom"
 CONTAINER_NAME="koopa-kingdom"
 WORKDIR="$HOME/AutoNav_25-26/"
 ENTRYPOINT="/usr/local/bin/scripts/entrypoint.sh"

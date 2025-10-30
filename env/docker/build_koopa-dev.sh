@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_NAME="autonav"
+IMAGE_NAME="dev"
 IMAGE_TAG="koopa-kingdom"
 
 ROOT="$(dirname ${BASH_SOURCE[0]})"
@@ -13,6 +13,3 @@ fi
 
 
 docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" "$HOME/AutoNav_25-26/env/docker/dockerfiles" 
-
-
-
