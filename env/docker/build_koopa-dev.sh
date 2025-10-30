@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_NAME="autonav"
+IMAGE_NAME="dev"
 IMAGE_TAG="koopa-kingdom"
 
 ROOT="$(dirname ${BASH_SOURCE[0]})"
