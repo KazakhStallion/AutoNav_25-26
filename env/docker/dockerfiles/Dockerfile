@@ -1,17 +1,15 @@
 FROM autonav:koopa-kingdom
 
-# deps
-RUN apt-get update && apt-get install -y \
-	gosu	\
-	bluez \
-	bluez-tools \
-	dbus \
-	evtest \
-	joystick \
-	udev \
-	ros-humble-point-cloud-transport \
-	nano
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gosu \
+    bluez \
+    bluez-tools \
+    dbus \
+    evtest \
+    joystick \
+    udev \
+    nano \
+ && rm -rf /var/lib/apt/lists/*
 
-RUN pip install \
-	pyserial
-
+RUN python3 -m pip install --no-cache-dir pyserial

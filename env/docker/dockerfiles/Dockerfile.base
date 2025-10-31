@@ -1,14 +1,19 @@
 # ============================
-# Base image: autonav:koopa-kingdom
+# Base image: autonav:koopa-kingdom (Jetson L4T / JetPack)
 # ============================
 
-# Use the JetPack base that matches your Jetson
-# Example: r35.3.1 for Orin NX/Nano JetPack 5.1.1
-FROM nvcr.io/nvidia/l4t-jetpack:r35.3.1
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.4
 
-ENV DEBIAN_FRONTEND=noninteractive
+ARG ZED_SDK_MAJOR=4
+ARG ZED_SDK_MINOR=1
+ARG JETPACK_MAJOR=6
+ARG JETPACK_MINOR=2
+ARG L4T_MAJOR=36
+ARG L4T_MINOR=4
 
-# ---- System packages ----
+ENV DEBIAN_FRONTEND=noninteractive TZ=UTC
+
+# Basic toolchain + common dev packages + OpenCV dev + Python libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -19,41 +24,66 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     bash-completion \
     python3-pip \
-    python3-colcon-common-extensions \
     python3-rosdep \
     python3-vcstool \
-    && rm -rf /var/lib/apt/lists/*
+    python3-colcon-common-extensions \
+    software-properties-common \
+    gnupg \
+    lsb-release \
+    pkg-config \
+    # OpenCV
+    libopencv-dev \
+    python3-opencv \
+    python3-numpy \
+    # common libs useful for sensor drivers (SICK, USB, pcap)
+    libasio-dev \
+    libpcap0.8-dev \
+    libusb-1.0-0-dev \
+ && rm -rf /var/lib/apt/lists/*
 
-# ---- ROS 2 Humble ----
-RUN apt-get update && \
-    apt-get install -y software-properties-common && \
-    add-apt-repository universe && \
-    apt-get install -y curl gnupg2 lsb-release && \
-    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | apt-key add - && \
+# Add ROS 2 APT repo and install ROS Humble (ros-base + common libs)
+RUN add-apt-repository universe && \
+    curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
-    http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2.list' && \
-    apt-get update && apt-get install -y \
-    ros-humble-ros-base \
-    ros-humble-cv-bridge \
-    ros-humble-tf-transformations \
-    && rm -rf /var/lib/apt/lists/*
+      http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > \
+      /etc/apt/sources.list.d/ros2.list' && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      ros-humble-ros-base \
+      ros-humble-cv-bridge \
+      ros-humble-tf-transformations \
+      ros-humble-image-transport \
+      ros-humble-point-cloud-transport \
+      ros-humble-rclcpp \
+      ros-humble-rclcpp-components \
+      ros-humble-tf2-ros \
+      ros-humble-tf2-geometry-msgs \
+      ros-humble-geometry-msgs \
+      ros-humble-nav-msgs \
+      ros-humble-sensor-msgs \
+      ros-humble-joint-state-publisher \
+      ros-humble-xacro \
+      ros-humble-gazebo-ros-pkgs \
+      ros-humble-ros2-control \
+      ros-humble-ros2-controllers \
+ && rm -rf /var/lib/apt/lists/*
 
-# ---- NVIDIA / ZED SDK (optional, comment out if unused) ----
-# COPY ZED_SDK_Ubuntu20.run /tmp/
-# RUN chmod +x /tmp/ZED_SDK_Ubuntu20.run && \
-#     /tmp/ZED_SDK_Ubuntu20.run silent && \
-#     rm /tmp/ZED_SDK_Ubuntu20.run
+# Install ZED SDK (Jetson)
+COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/jetson_download_and_install_sdk.sh
+RUN chmod +x /tmp/jetson_download_and_install_sdk.sh && \
+    /tmp/jetson_download_and_install_sdk.sh ${JETPACK_MAJOR} ${JETPACK_MINOR} ${L4T_MAJOR} ${L4T_MINOR} ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR} || true && \
+    rm -f /tmp/jetson_download_and_install_sdk.sh
 
-# ---- Isaac ROS setup (optional) ----
-# RUN apt-get install -y ros-humble-isaac-ros-common
 
-# ---- Create default user ----
-RUN useradd -ms /bin/bash admin && \
-    echo "admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+# Create non-root user to match common host UID/GID=1000
+RUN useradd -ms /bin/bash -u 1000 admin && echo "admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 USER admin
 WORKDIR /home/admin
 
-# ---- Source ROS automatically ----
-RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+# Auto-source ROS
+RUN echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
+
+# Keep rosdep data available for later installs
+RUN sudo rosdep update || true
 
 CMD ["/bin/bash"]
