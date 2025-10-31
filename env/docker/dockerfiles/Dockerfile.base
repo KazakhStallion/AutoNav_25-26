@@ -1,20 +1,16 @@
 # ============================
-# Base image: autonav:koopa-kingdom (Jetson L4T / JetPack)
+# Base image: autonav:koopa-kingdom (Ubuntu 22.04 / ROS 2 Humble)
 # ============================
+FROM ubuntu:22.04
 
-FROM nvcr.io/nvidia/l4t-jetpack:r36.4.4
-
-ARG ZED_SDK_MAJOR=4
-ARG ZED_SDK_MINOR=1
-ARG JETPACK_MAJOR=6
-ARG JETPACK_MINOR=2
-ARG L4T_MAJOR=36
-ARG L4T_MINOR=4
-
-ENV DEBIAN_FRONTEND=noninteractive TZ=UTC
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 # Basic toolchain + common dev packages + OpenCV dev + Python libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     build-essential \
     cmake \
     git \
@@ -23,15 +19,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     nano \
     bash-completion \
+    pkg-config \
+    gnupg \
+    lsb-release \
+    # Python / ROS tooling
     python3-pip \
     python3-rosdep \
     python3-vcstool \
     python3-colcon-common-extensions \
-    software-properties-common \
-    gnupg \
-    lsb-release \
-    pkg-config \
-    # OpenCV
+    # OpenCV (C++ and Python)
     libopencv-dev \
     python3-opencv \
     python3-numpy \
@@ -41,8 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libusb-1.0-0-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Add ROS 2 APT repo and install ROS Humble (ros-base + common libs)
-RUN add-apt-repository universe && \
+# Add ROS 2 APT repo and install ROS Humble (Jammy) + common packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      software-properties-common \
+ && add-apt-repository universe && \
     curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
       -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
@@ -68,22 +66,14 @@ RUN add-apt-repository universe && \
       ros-humble-ros2-controllers \
  && rm -rf /var/lib/apt/lists/*
 
-# Install ZED SDK (Jetson)
+# Install ZED SDK for Jetson inside the container.
 COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/jetson_download_and_install_sdk.sh
 RUN chmod +x /tmp/jetson_download_and_install_sdk.sh && \
-    /tmp/jetson_download_and_install_sdk.sh ${JETPACK_MAJOR} ${JETPACK_MINOR} ${L4T_MAJOR} ${L4T_MINOR} ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR} || true && \
+    /tmp/jetson_download_and_install_sdk.sh 6 2 36 4 4 1 || true && \
     rm -f /tmp/jetson_download_and_install_sdk.sh
 
+# Keep rosdep data available for later installs (best-effort)
+RUN rosdep update || true
 
-# Create non-root user to match common host UID/GID=1000
-RUN useradd -ms /bin/bash -u 1000 admin && echo "admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-USER admin
-WORKDIR /home/admin
-
-# Auto-source ROS
-RUN echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
-
-# Keep rosdep data available for later installs
-RUN sudo rosdep update || true
-
+# Default shell
 CMD ["/bin/bash"]
