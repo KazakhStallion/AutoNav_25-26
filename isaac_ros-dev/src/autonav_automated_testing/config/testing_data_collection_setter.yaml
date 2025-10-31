@@ -1,0 +1,14 @@
+data_publisher:
+  ros__parameters:
+    # Tells the data_publisher.cpp node which topics to subscribe to for data collection.
+    t001: {"/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"}
+    t002: {}
+    t003: {}
+    t004: {}
+    t005: {}
+    t006: {}
+    t007: {}
+    t008: {}
+    t009: {}
+    t010: {}
+    t011: {}
