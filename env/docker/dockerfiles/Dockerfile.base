@@ -10,31 +10,31 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Basic toolchain + common dev packages + OpenCV dev + Python libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    build-essential \
-    cmake \
-    git \
-    curl \
-    wget \
-    sudo \
-    nano \
-    bash-completion \
-    pkg-config \
-    gnupg \
-    lsb-release \
-    # Python / ROS tooling
-    python3-pip \
-    python3-rosdep \
-    python3-vcstool \
-    python3-colcon-common-extensions \
-    # OpenCV (C++ and Python)
-    libopencv-dev \
-    python3-opencv \
-    python3-numpy \
-    # common libs useful for sensor drivers (SICK, USB, pcap)
-    libasio-dev \
-    libpcap0.8-dev \
-    libusb-1.0-0-dev \
+      ca-certificates \
+      gnupg \
+      lsb-release \
+      software-properties-common \
+ && add-apt-repository universe \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      cmake \
+      git \
+      curl \
+      wget \
+      sudo \
+      nano \
+      bash-completion \
+      pkg-config \
+      python3-pip \
+      python3-rosdep \
+      python3-vcstool \
+      python3-colcon-common-extensions \
+      libopencv-dev \
+      python3-opencv \
+      python3-numpy \
+      libasio-dev \
+      libpcap0.8-dev \
+      libusb-1.0-0-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Add ROS 2 APT repo and install ROS Humble (Jammy) + common packages
