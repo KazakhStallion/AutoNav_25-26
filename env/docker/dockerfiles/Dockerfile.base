@@ -1,0 +1,59 @@
+# ============================
+# Base image: autonav:koopa-kingdom
+# ============================
+
+# Use the JetPack base that matches your Jetson
+# Example: r35.3.1 for Orin NX/Nano JetPack 5.1.1
+FROM nvcr.io/nvidia/l4t-jetpack:r35.3.1
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ---- System packages ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    sudo \
+    nano \
+    bash-completion \
+    python3-pip \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- ROS 2 Humble ----
+RUN apt-get update && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository universe && \
+    apt-get install -y curl gnupg2 lsb-release && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | apt-key add - && \
+    sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+    http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2.list' && \
+    apt-get update && apt-get install -y \
+    ros-humble-ros-base \
+    ros-humble-cv-bridge \
+    ros-humble-tf-transformations \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- NVIDIA / ZED SDK (optional, comment out if unused) ----
+# COPY ZED_SDK_Ubuntu20.run /tmp/
+# RUN chmod +x /tmp/ZED_SDK_Ubuntu20.run && \
+#     /tmp/ZED_SDK_Ubuntu20.run silent && \
+#     rm /tmp/ZED_SDK_Ubuntu20.run
+
+# ---- Isaac ROS setup (optional) ----
+# RUN apt-get install -y ros-humble-isaac-ros-common
+
+# ---- Create default user ----
+RUN useradd -ms /bin/bash admin && \
+    echo "admin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+USER admin
+WORKDIR /home/admin
+
+# ---- Source ROS automatically ----
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+
+CMD ["/bin/bash"]
