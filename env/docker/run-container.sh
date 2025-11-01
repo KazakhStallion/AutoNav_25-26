@@ -52,7 +52,7 @@ DOCKER_ARGS+=("-e" "NVIDIA_DRIVER_CAPABILITIES=all")
 if [[ "$(uname -m)" == "aarch64" ]]; then
   DOCKER_ARGS+=("-v /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra")
   DOCKER_ARGS+=("-v /usr/src/jetson_multimedia_api:/usr/src/jetson_multimedia_api")
-  DOCKER_ARGS+=("-v /usr/share/vpi3:/usr/share/vpi3")
+  [ -d /usr/share/vpi3 ] && DOCKER_ARGS+=("-v /usr/share/vpi3:/usr/share/vpi3")
   DOCKER_ARGS+=("--pid=host")
   DOCKER_ARGS+=("-v /dev:/dev")
   if [ -S /run/jtop.sock ]; then
