@@ -10,25 +10,29 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Basic toolchain + common dev packages + OpenCV dev + Python libs
 RUN set -eux; \
-    # Use ARM64 (ports) mirror to avoid 404s on Jetson
+    # Use ARM64 ports mirror
     sed -i 's|archive.ubuntu.com|ports.ubuntu.com|g' /etc/apt/sources.list; \
-    apt-get update -o Acquire::Retries=3; \
+    apt-get update; \
     # tools needed before add-apt-repository
     apt-get install -y --no-install-recommends \
       ca-certificates gnupg lsb-release software-properties-common; \
     # enable universe (needed for python3-opencv, etc.)
     add-apt-repository -y universe; \
-    apt-get update -o Acquire::Retries=3; \
-    # core toolchain + libs (from apt)
+    apt-get update; \
+    # core toolchain + common libs
     apt-get install -y --no-install-recommends \
       build-essential cmake git curl wget sudo nano bash-completion pkg-config \
-      python3-pip python3-rosdep \
+      python3-pip \
       libopencv-dev python3-opencv python3-numpy \
       libasio-dev libpcap0.8-dev libusb-1.0-0-dev; \
     rm -rf /var/lib/apt/lists/*; \
-    # Install vcstool & colcon via pip
+    # Python tools via pip
     python3 -m pip install --no-cache-dir -U pip; \
-    python3 -m pip install --no-cache-dir vcstool colcon-common-extensions
+    python3 -m pip install --no-cache-dir rosdep vcstool colcon-common-extensions; \
+    # Initialize rosdep database
+    rosdep init || true; \
+    rosdep update || true
+
 
 
 # Add ROS 2 APT repo and install ROS Humble (Jammy) + common packages
