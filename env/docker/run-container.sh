@@ -55,8 +55,8 @@ if [[ "$(uname -m)" == "aarch64" ]]; then
   DOCKER_ARGS+=("-v /usr/share/vpi3:/usr/share/vpi3")
   DOCKER_ARGS+=("--pid=host")
   DOCKER_ARGS+=("-v /dev:/dev")
-  if getent group jtop >/dev/null; then
-    DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
+  if [ -S /run/jtop.sock ]; then
+      DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
   fi
 fi
 
