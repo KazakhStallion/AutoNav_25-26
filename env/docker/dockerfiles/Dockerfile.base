@@ -33,18 +33,16 @@ RUN set -eux; \
     rosdep init || true; \
     rosdep update || true
 
-
-
 # Add ROS 2 APT repo and install ROS Humble (Jammy) + common packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
       software-properties-common \
- && add-apt-repository universe && \
-    curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-      -o /usr/share/keyrings/ros-archive-keyring.gpg && \
-    sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+ && add-apt-repository -y universe \
+ && curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg \
+ && sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
       http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > \
-      /etc/apt/sources.list.d/ros2.list' && \
-    apt-get update && apt-get install -y --no-install-recommends \
+      /etc/apt/sources.list.d/ros2.list' \
+ && apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-ros-base \
       ros-humble-cv-bridge \
       ros-humble-tf-transformations \
@@ -59,7 +57,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-sensor-msgs \
       ros-humble-joint-state-publisher \
       ros-humble-xacro \
-      ros-humble-gazebo-ros-pkgs \
       ros-humble-ros2-control \
       ros-humble-ros2-controllers \
  && rm -rf /var/lib/apt/lists/*
