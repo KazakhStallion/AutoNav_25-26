@@ -1,14 +1,93 @@
 data_publisher:
   ros__parameters:
     # Tells the data_publisher.cpp node which topics to subscribe to for data collection.
-    t001: {"/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"}
-    t002: {}
-    t003: {}
-    t004: {}
-    t005: {}
-    t006: {}
-    t007: {}
-    t008: {}
-    t009: {}
-    t010: {}
-    t011: {}
+    # Add any combination of topics below based on what data you need for each test.
+    #
+    # ==================== AVAILABLE TOPICS IN AUTONAV PROJECT ====================
+    #
+    # --- NAVIGATION & LOCALIZATION ---
+    # /odom                          - Odometry data (nav_msgs/Odometry) - robot position/velocity
+    # /tf                            - Transform tree (tf2_msgs/TFMessage) - coordinate frames
+    # /tf_static                     - Static transforms (tf2_msgs/TFMessage)
+    # /scan                          - 2D laser scan (sensor_msgs/LaserScan) - from LiDAR
+    # /cmd_vel                       - Command velocity (geometry_msgs/Twist) - target speeds
+    # /goal_pose                     - Navigation goal (geometry_msgs/PoseStamped)
+    # /local_costmap/costmap         - Local planning costmap (nav_msgs/OccupancyGrid)
+    # /global_costmap/costmap        - Global planning costmap (nav_msgs/OccupancyGrid)
+    # /line_costmap                  - Line detection costmap (nav_msgs/OccupancyGrid)
+    # /plan                          - Navigation path plan (nav_msgs/Path)
+    #
+    # --- GPS & POSITIONING ---
+    # /gps/fix                       - GPS position (sensor_msgs/NavSatFix) - lat/lon/alt
+    # /gps/filtered                  - Filtered GPS data (sensor_msgs/NavSatFix)
+    # /odometry/gps                  - GPS-based odometry (nav_msgs/Odometry)
+    # /odometry/local_ekf            - Local EKF odometry (nav_msgs/Odometry)
+    # /odometry/global_ekf           - Global EKF odometry (nav_msgs/Odometry)
+    #
+    # --- SENSORS ---
+    # /imu/data                      - IMU data (sensor_msgs/Imu) - acceleration/gyro/orientation
+    # /encoders                      - Wheel encoders (autonav_interfaces/Encoders) - wheel rotations
+    # /depth_camera/points           - Point cloud (sensor_msgs/PointCloud2) - 3D depth data
+    # /camera/image_raw              - Camera image (sensor_msgs/Image)
+    # /zed/zed_node/rgb/image_rect_color - ZED camera RGB image
+    # /zed/zed_node/depth/depth_registered - ZED depth image
+    # /zed/zed_node/point_cloud/cloud_registered - ZED point cloud
+    #
+    # --- CONTROL & STATUS ---
+    # /joy                           - Joystick input (sensor_msgs/Joy) - controller buttons/axes
+    # /estop                         - Emergency stop status (std_msgs/String)
+    # /autonomous_mode               - Autonomous mode toggle (std_msgs/Bool)
+    #
+    # --- LINE DETECTION ---
+    # /line_detection/lines          - Detected lines (custom message type)
+    # /line_detection/debug_image    - Debug visualization image
+    #
+    # --- AUTOMATED TESTING (Internal) ---
+    # /data/toggle_collect           - Enable/disable data collection (std_msgs/Bool)
+    # /data/dump                     - CSV data output stream (std_msgs/String)
+    #
+    # =============================================================================
+    #
+    # USAGE: Add topic names as a list for each test ID.
+    # Example: t001: ["/gps/fix", "/odom", "/cmd_vel", "/encoders"]
+    #
+    # NOTE: The data_publisher node currently supports these message types:
+    #   - sensor_msgs/NavSatFix (GPS data)
+    #   - nav_msgs/Odometry (odometry)
+    #   - geometry_msgs/Twist (cmd_vel)
+    #   - std_msgs/String (encoders, generic string data)
+    # To add support for other types, modify data_publisher.cpp
+    #
+    
+    # Test 001: GPS Calibration - Validates GPS accuracy and waypoint navigation
+    t001: ["/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"]
+    
+    # Test 002: Line Compliance
+    t002: []
+    
+    # Test 003: Forward Movement
+    t003: []
+    
+    # Test 004: Object Detection
+    t004: []
+    
+    # Test 005: Path Planning
+    t005: []
+    
+    # Test 006: Simulation
+    t006: []
+    
+    # Test 007: Speed
+    t007: []
+    
+    # Test 008: Acceleration
+    t008: []
+    
+    # Test 009: Rotation
+    t009: []
+    
+    # Test 010: Steering Drift
+    t010: []
+    
+    # Test 011: Incline Performance
+    t011: []
