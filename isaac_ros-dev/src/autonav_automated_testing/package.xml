@@ -3,16 +3,26 @@
 <package format="3">
   <name>autonav_automated_testing</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Automated testing system for AutoNav robot with RQT plugin interface</description>
   <maintainer email="nfikes@todo.todo">nfikes</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>pluginlib</depend>
   <depend>rqt_gui</depend>
   <depend>rqt_gui_cpp</depend>
+  
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>gps_handler</exec_depend>
+  <exec_depend>gps_waypoint_handler</exec_depend>
+  <exec_depend>bringup</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

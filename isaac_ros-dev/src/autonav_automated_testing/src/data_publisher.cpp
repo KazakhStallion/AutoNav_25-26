@@ -1,93 +1,201 @@
 #include <rclcpp/rclcpp.hpp>
-#include "serialib.hpp"
-#include "std_msgs/msg/string.hpp"
+#include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 
 #include <string>
+#include <vector>
+#include <sstream>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
 
-#define DEBUG_ESTOP
+/**
+ * @brief Data Publisher Node for Automated Testing
+ * 
+ * This node collects data from multiple topics during automated tests:
+ * - Subscribes to "/data/toggle_collect" to enable/disable data collection
+ * - Subscribes to "/estop" for emergency stop monitoring
+ * - Subscribes to test-specific topics (GPS, odometry, cmd_vel, etc.)
+ * - Publishes collected data to "/data/dump" topic
+ * 
+ * The data is formatted as CSV-style strings for easy logging by the automater scripts.
+ */
 
-// This node is meant to be looking at two main topics:
-//  Subscribe "/data/toggle_collect" Topic
-//  Publish   "/data/dump" Topic
-//
-// When a test is initiated through one of the t001_[TEST NAME].launch.py files
-// this Node will be started. Then it will look at the "/data/toggle_collect" Topic
-//
-// Depending on how the Node is launched, it will additionally look at other
-// data Topics hosted by a number of other Nodes in the ROS2 stack.
-//
-// When allowed by seeing a TRUE through the "/data/toggle_collect" Topic
-// Will start publishing all data from all Topics to "/data/dump" Topic
-//
-// This "/data/dump" Topic will then be put into log files by the corresponding
-// t001_automater.py file.
+class DataPublisherNode : public rclcpp::Node {
+private:
+    // Control subscribers
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr toggle_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr estop_sub_;
+    
+    // Data publishers
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr data_dump_pub_;
+    
+    // Timer for periodic data publishing
+    rclcpp::TimerBase::SharedPtr publish_timer_;
+    
+    // State variables
+    bool collecting_data_;
+    bool estop_triggered_;
+    std::string test_id_;
+    
+    // Latest data storage
+    std::string latest_gps_data_;
+    std::string latest_odom_data_;
+    std::string latest_cmd_vel_data_;
+    std::string latest_encoder_data_;
+    
+    // Generic subscribers - will be created dynamically based on topics_to_monitor
+    std::vector<rclcpp::SubscriptionBase::SharedPtr> dynamic_subscribers_;
 
-// ALL CODE HERE IS Pseudo Code for setting up the purpose of this node.
-
-class ControlNode : public rclcpp::Node {
-
-    public:
-
-    Data_Publisher_Node() : Node("data_publisher_node"){
-        // Topics to Subscribe to:
-        this->declare_parameter("data_toggle_collect", "/data/toggle_collect");
-
-        // Serial Ports (Always be on the E-Stop for if testing needs to be ended)
-        this->declare_parameter("estop_port", "/dev/ttyTHS1");
+public:
+    DataPublisherNode() : Node("data_publisher_node"), collecting_data_(false), estop_triggered_(false) {
+        // Declare parameters
+        this->declare_parameter("test_id", "t001");
+        this->declare_parameter("topics_to_monitor", std::vector<std::string>{});
+        this->declare_parameter("publish_rate", 10.0);
+        
+        // Get parameters
+        test_id_ = this->get_parameter("test_id").as_string();
+        auto topics = this->get_parameter("topics_to_monitor").as_string_array();
+        double rate = this->get_parameter("publish_rate").as_double();
+        
+        RCLCPP_INFO(this->get_logger(), "Starting Data Publisher Node for test: %s", test_id_.c_str());
+        
+        // Create control subscriptions
+        toggle_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            "/data/toggle_collect", 10,
+            std::bind(&DataPublisherNode::toggle_callback, this, std::placeholders::_1));
+        
+        estop_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/estop", 10,
+            std::bind(&DataPublisherNode::estop_callback, this, std::placeholders::_1));
+        
+        // Create data dump publisher
+        data_dump_pub_ = this->create_publisher<std_msgs::msg::String>("/data/dump", 10);
+        
+        // Subscribe to test-specific topics
+        for (const auto& topic : topics) {
+            RCLCPP_INFO(this->get_logger(), "Monitoring topic: %s", topic.c_str());
+            subscribe_to_topic(topic);
+        }
+        
+        // Create timer for periodic publishing
+        auto period = std::chrono::duration<double>(1.0 / rate);
+        publish_timer_ = this->create_wall_timer(
+            std::chrono::duration_cast<std::chrono::milliseconds>(period),
+            std::bind(&DataPublisherNode::publish_data, this));
+        
+        RCLCPP_INFO(this->get_logger(), "Data Publisher Node initialized");
     }
 
-    // Subscribe to "/data/toggle_collect" Topic (This topic holds a Boolean)
-    // This tells the node when to start and stop publishing data to the "/data/dump" Topic
-    formatrclcpp::Subscription<data_toggle_msgs::msg::Data>::SharedPtr dataSub;
-
-    // Depends on the test being executed "t001", and what the testing_data_collection_setter.yaml says.
-    // Using the testing_data_collection_setter.yaml specific test "t001" for example: {"/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"}
-    // These are from the parameters upon a .launch.py file launching the Node.
-    std::topics_to_subscribe<str> topics = {};
-    for (int topic : topics) {
-        formatrclcpp::Subscription<TODO::msg::TODO>::SharedPtr TODOSub;
+private:
+    void subscribe_to_topic(const std::string& topic) {
+        if (topic == "/gps/fix") {
+            auto sub = this->create_subscription<sensor_msgs::msg::NavSatFix>(
+                topic, 10,
+                [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(8)
+                       << msg->latitude << "," << msg->longitude << "," << msg->altitude;
+                    latest_gps_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/odom") {
+            auto sub = this->create_subscription<nav_msgs::msg::Odometry>(
+                topic, 10,
+                [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(4)
+                       << msg->pose.pose.position.x << ","
+                       << msg->pose.pose.position.y << ","
+                       << msg->pose.pose.orientation.z;
+                    latest_odom_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/cmd_vel") {
+            auto sub = this->create_subscription<geometry_msgs::msg::Twist>(
+                topic, 10,
+                [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(3)
+                       << msg->linear.x << "," << msg->angular.z;
+                    latest_cmd_vel_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/encoders") {
+            auto sub = this->create_subscription<std_msgs::msg::String>(
+                topic, 10,
+                [this](const std_msgs::msg::String::SharedPtr msg) {
+                    latest_encoder_data_ = msg->data;
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        // Add more topic types as needed
     }
 
-    // Publish to "/data/dump" Topic
-    // This is a CSV style data output format using all the Subscribed Topics. May need to be formatted.
-    rclcpp::Publisher<data::msg::Data>::SharedPtr dataPub;
-
-    void data_publishing_formater(const std_msgs::msg::String::SharedPtr dataPub){
+    void toggle_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+        collecting_data_ = msg->data;
+        if (collecting_data_) {
+            RCLCPP_INFO(this->get_logger(), "Data collection ENABLED");
+            // Clear previous data
+            latest_gps_data_.clear();
+            latest_odom_data_.clear();
+            latest_cmd_vel_data_.clear();
+            latest_encoder_data_.clear();
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Data collection DISABLED");
+        }
     }
 
-    void estop_callback(const std_msgs::msg::String::SharedPtr msg){
-	    std::string incoming = msg->data; 
+    void estop_callback(const std_msgs::msg::String::SharedPtr msg) {
+        std::string incoming = msg->data;
+        
         if (incoming.empty()) {
-	        #ifdef DEBUG_ESTOP
-	        RCLCPP_INFO(this->get_logger(), "incoming string empty");
-	        #endif
             return;
-            }
+        }
+        
+        RCLCPP_INFO(this->get_logger(), "E-Stop message received: %s", incoming.c_str());
+        
+        if (incoming == "STOP") {
+            RCLCPP_WARN(this->get_logger(), "ESTOP PRESSED: Stopping data collection");
+            estop_triggered_ = true;
+            collecting_data_ = false;
+        }
+    }
 
-            #ifdef DEBUG_ESTOP
-            RCLCPP_INFO(this->get_logger(), "incoming string: %s", incoming.c_str());
-            #endif
-
-            if (incoming == "STOP") {
-                RCLCPP_WARN(this->get_logger(), "ESTOP PRESSED: MOTORS SHUTTING DOWN");
-                motors.shutdown();
-            }
-    }  
-
-    void configure(const std::shared_ptr<autonav_interfaces::srv::ConfigureControl::Request> request, 
-                         std::shared_ptr<autonav_interfaces::srv::ConfigureControl::Response> response) {
-
-
-        // configure serial
-        std::string estop_port = this->get_parameter("estop_port").as_string();
-
-        estop_sub_ = this->create_subscription<std_msgs::msg::String>("/estop", 10, std::bind(&ControlNode::estop_callback, this, std::placeholders::_1));
+    void publish_data() {
+        if (!collecting_data_ || estop_triggered_) {
+            return;
+        }
+        
+        // Get current timestamp
+        auto now = this->get_clock()->now();
+        
+        // Format data as CSV: timestamp,gps_data,odom_data,cmd_vel_data,encoder_data
+        std::stringstream ss;
+        ss << now.seconds() << ","
+           << latest_gps_data_ << ","
+           << latest_odom_data_ << ","
+           << latest_cmd_vel_data_ << ","
+           << latest_encoder_data_;
+        
+        auto msg = std_msgs::msg::String();
+        msg.data = ss.str();
+        
+        data_dump_pub_->publish(msg);
     }
 };
 
-
 int main(int argc, char** argv) {
-    rclcpp::init(argc,argv);
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<DataPublisherNode>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

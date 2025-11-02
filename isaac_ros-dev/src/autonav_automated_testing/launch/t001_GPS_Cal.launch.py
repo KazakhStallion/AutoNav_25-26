@@ -1,39 +1,127 @@
-import subprocess
-import sys
+import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import ExecuteProcess, IncludeLaunchDescription, DeclareLaunchArgument
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
 '''
-Launch script for [TEST ID: 001] automated test script.
-Launching this script will start the test.
+Launch script for [TEST ID: 001] GPS Calibration automated test.
+Launching this script will:
+1. Start the data_publisher node to collect test data
+2. Launch GPS handler and waypoint navigation nodes
+3. Start the core robot bringup (TF, odometry, sensors, control)
+4. Execute the t001_automater.py script to manage the test
 '''
 
 def generate_launch_description():
 
-    # Grab the YAML that stores all the Topic names that we need to subscribe to for this test.
+    # Declare launch arguments
+    use_sim_time = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation (Gazebo) clock if true'
+    )
+
+    # Get package directories
+    autonav_testing_share = get_package_share_directory('autonav_automated_testing')
+    bringup_share = FindPackageShare('bringup')
+    
+    # Path to test data configuration file
     test_data_config = os.path.join(
-        get_package_share_directory('autonav_automated_testing'),
+        autonav_testing_share,
         'config',
         'testing_data_collection_setter.yaml'
     )
-    with open( test_data_config, 'r') as f:
+    
+    # Load topics to monitor for this specific test
+    with open(test_data_config, 'r') as f:
         all_params = yaml.safe_load(f)
-        topics = all_params.get('t001', {})  
+        # Get the topics for t001 from the data_publisher section
+        data_publisher_params = all_params.get('data_publisher', {}).get('ros__parameters', {})
+        topics_to_monitor = data_publisher_params.get('t001', [])
 
+    # Data Publisher Node - collects data from specified topics
     data_publisher_node = Node(
-        package='data_publisher',
+        package='autonav_automated_testing',
         executable='data_publisher',
         name='data_publisher_node',
-        parameters=[topics]
+        output='screen',
+        parameters=[{
+            'topics_to_monitor': list(topics_to_monitor),
+            'test_id': 't001',
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }]
     )
 
-    # Launch the specific python script to automatically start the test.
-    # For this test launch the t001_automater.py file.
-    subprocess.run([sys.executable, "t001_automater.py"])
+    # GPS Handler Node - publishes GPS fix data
+    gps_handler_node = Node(
+        package='gps_handler',
+        executable='gps_publisher',
+        name='gps_publisher_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'gps_port': '/dev/ttyUSB0'  # Adjust based on your GPS device
+        }]
+    )
+
+    # GPS Waypoint Handler Node - manages waypoint navigation
+    gps_waypoint_node = Node(
+        package='gps_waypoint_handler',
+        executable='gps_waypoint_bringup',
+        name='gps_waypoint_bringup_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }]
+    )
+
+    # Include core bringup launch file (TF, sensors, control)
+    # This launches the essential nodes for robot operation
+    core_bringup = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([bringup_share, 'launch', 'bringup.launch.py'])
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }.items()
+    )
+
+    # Execute the test automater script
+    # This script handles test orchestration, data collection, and log file generation
+    automater_script_path = os.path.join(
+        os.path.dirname(autonav_testing_share),
+        '..',
+        '..',
+        'scripts',
+        'automatic_testing',
+        't001_automater.py'
+    )
+    
+    test_automater = ExecuteProcess(
+        cmd=['python3', automater_script_path],
+        output='screen',
+        name='t001_automater'
+    )
 
     return LaunchDescription([
-        data_publisher_node
-        ])
+        # Launch arguments
+        use_sim_time,
+        
+        # Core robot nodes
+        core_bringup,
+        
+        # GPS-related nodes
+        gps_handler_node,
+        gps_waypoint_node,
+        
+        # Data collection node
+        data_publisher_node,
+        
+        # Test automation script
+        test_automater
+    ])
