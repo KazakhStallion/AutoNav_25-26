@@ -1,0 +1,7 @@
+<library path="libautonav_automated_testing_plugin">
+  <class name="autonav_automated_testing::Plugin"
+         type="autonav_automated_testing::Plugin"
+         base_class_type="rqt_gui_cpp::Plugin">
+    <description>AutoNav Automated Testing Plugin</description>
+  </class>
+</library>

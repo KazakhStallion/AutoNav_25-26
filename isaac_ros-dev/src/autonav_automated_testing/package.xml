@@ -1,31 +1,24 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>autonav_automated_testing</name>
-  <version>0.1.0</version>
-  <description>Automated Testing RQt Plugin for ROS2 Humble</description>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="nfikes@todo.todo">nfikes</maintainer>
+  <license>Apache-2.0</license>
 
-  <maintainer email="you@example.com">Your Name</maintainer>
-  <license>MIT</license>
-
-  <!-- Core dependencies -->
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>setuptools</buildtool_depend>
 
-  <!-- RQt GUI dependencies (Qt bindings included with ROS2 Humble) -->
-  <exec_depend>rqt_gui</exec_depend>
-  <exec_depend>rqt_gui_py</exec_depend>
-  <exec_depend>python_qt_binding</exec_depend>
+  <depend>rclcpp</depend>
+  <depend>pluginlib</depend>
+  <depend>rqt_gui</depend>
+  <depend>rqt_gui_cpp</depend>
 
-  <!-- ROS 2 launch system -->
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
-
-  <!-- Ament dependencies -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <export>
-    <!-- Register rqt plugin -->
     <rqt_gui plugin="${prefix}/plugin.xml"/>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

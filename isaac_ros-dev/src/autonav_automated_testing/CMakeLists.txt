@@ -1,53 +1,43 @@
 cmake_minimum_required(VERSION 3.8)
 project(autonav_automated_testing)
 
-# Enable warnings for C++ code (if any)
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# --- Find ROS 2 dependencies ---
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
-find_package(rclpy REQUIRED)
-find_package(rqt_gui REQUIRED)
-find_package(rqt_gui_py REQUIRED)
-find_package(python_qt_binding REQUIRED)
-find_package(launch REQUIRED)
-find_package(launch_ros REQUIRED)
+find_package(rqt_gui_cpp REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
-# --- Install Python package (so plugin is discoverable) ---
-ament_python_install_package(${PROJECT_NAME})
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# --- Install Python scripts if you have CLI or launch helpers ---
-install(PROGRAMS
-  launch/automated_testing.launch.py
-  DESTINATION lib/${PROJECT_NAME}
+add_library(${PROJECT_NAME}_plugin SHARED
+  src/autonav_automated_testing_plugin.cpp
 )
 
-# --- Install launch files directory ---
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
+target_include_directories(${PROJECT_NAME}_plugin PUBLIC
+  include
 )
 
-# --- Install plugin description XML (for RQt to load it) ---
-install(FILES
-  plugin.xml
+target_link_libraries(${PROJECT_NAME}_plugin
+  Qt5::Widgets
+  rqt_gui_cpp::rqt_gui_cpp
+)
+
+ament_target_dependencies(${PROJECT_NAME}_plugin
+  rqt_gui_cpp
+  Qt5
+)
+
+# Export the plugin.xml
+pluginlib_export_plugin_description_file(rqt_gui "plugin.xml")
+
+install(TARGETS ${PROJECT_NAME}_plugin
+  LIBRARY DESTINATION lib
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION include/${PROJECT_NAME}
+)
+install(FILES plugin.xml
   DESTINATION share/${PROJECT_NAME}
 )
 
-# --- Optional: resource marker for ament index ---
-install(DIRECTORY
-  resource/
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-# --- Testing (optional) ---
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-endif()
-
-# --- Declare the package for ament ---
 ament_package()
