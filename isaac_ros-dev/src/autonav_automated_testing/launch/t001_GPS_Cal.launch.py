@@ -9,12 +9,11 @@ from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
 '''
-Launch script for [TEST ID: 001] GPS Calibration automated test.
+Launch script for [TEST ID: t001] GPS Calibration automated test.
 Launching this script will:
 1. Start the data_publisher node to collect test data
-2. Launch GPS handler and waypoint navigation nodes
-3. Start the core robot bringup (TF, odometry, sensors, control)
-4. Execute the t001_automater.py script to manage the test
+2. Launch specific Nodes or Launch files related to this test
+3. Execute the t001_automater.py script to manage the test
 '''
 
 def generate_launch_description():
@@ -28,7 +27,9 @@ def generate_launch_description():
 
     # Get package directories
     autonav_testing_share = get_package_share_directory('autonav_automated_testing')
+    # ===== Test Specific Packages ===== #
     bringup_share = FindPackageShare('bringup')
+    # ================================== #
     
     # Path to test data configuration file
     test_data_config = os.path.join(
@@ -57,6 +58,9 @@ def generate_launch_description():
         }]
     )
 
+    # ===== Lines below here are specific to the t001 test ===== #
+
+    # [NODES] #
     # GPS Handler Node - publishes GPS fix data
     gps_handler_node = Node(
         package='gps_handler',
@@ -80,6 +84,7 @@ def generate_launch_description():
         }]
     )
 
+    # [LAUNCH FILES] #
     # Include core bringup launch file (TF, sensors, control)
     # This launches the essential nodes for robot operation
     core_bringup = IncludeLaunchDescription(
@@ -107,17 +112,21 @@ def generate_launch_description():
         output='screen',
         name='t001_automater'
     )
+    # ========================================================== #
 
     return LaunchDescription([
         # Launch arguments
         use_sim_time,
         
-        # Core robot nodes
-        core_bringup,
-        
-        # GPS-related nodes
+        # ===== Specific to test ===== #
+ 
+        # [NODES] #
         gps_handler_node,
         gps_waypoint_node,
+
+        # [LAUNCH FILES] #
+        core_bringup,
+        # ============================ #
         
         # Data collection node
         data_publisher_node,

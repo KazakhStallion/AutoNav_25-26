@@ -1,7 +1,6 @@
-
 #!/usr/bin/env python3
 """
-t001_automater.py - GPS Calibration Test Automater
+t009_automater.py - Rotation Test Automater
 
 This script manages the automated test:
 1. Creates a log file with test metadata
@@ -16,10 +15,10 @@ ARCHITECTURE:
 - test_actions(): Test-specific function containing triggers for test actions
 - stop_test(): Generic function that disables data collection and saves logs (reusable for all tests)
 
-TEST Briefing (T001):
-- A square waypoint pattern is made north of the robot and on the east side.
-- WP0 (0,0) → WP1 (10,0) → WP2 (10,-10) → WP3 (0,-10) → WP0 (0,0)
-- 5-second pause at each waypoint except final return to start.
+TEST Briefing (T009):
+- 
+- 
+- 
 """
 
 import rclpy
@@ -34,13 +33,13 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-class T001Automater(Node):
+class T009Automater(Node):
     def __init__(self):
-        super().__init__('t001_automater')
+        super().__init__('t009_automater')
         
         # Test configuration
-        self.test_id = 't001'
-        self.test_name = 'GPS_Calibration'
+        self.test_id = 't009'
+        self.test_name = 'Rotation'
         self.test_started = False
         self.test_complete = False
         self.estop_triggered = False
@@ -50,14 +49,8 @@ class T001Automater(Node):
         self.collected_data = []
 
         # ===== Specific Variables related to executing the test_actions() ===== #
-        
-        # Waypoint tracking
-        self.waypoints = {}
-        self.current_waypoint_index = 0
-        self.waypoint_reached = False
-        self.pause_end_time = None
 
-        # ===== These variables will change between test scripts ===== #
+        # ====================================================================== #
         
         # Create log directory and file !!!(Change this later to store on Jetson)!!!
         # WHEN CHANGED, CHANGE FOR ALL AUTOMATER FILES
@@ -79,7 +72,6 @@ class T001Automater(Node):
             String, '/estop', self.estop_callback, 10)
         
         # ===== Test Specific Publishers  ===== #
-        self.waypoint_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         # ===== Test Specific Publishers  ===== #
 
         # ===== Test Specific Subscribers ===== #
@@ -146,141 +138,13 @@ class T001Automater(Node):
         self.toggle_pub.publish(toggle_msg)
         self.get_logger().info('Data collection enabled')
     
-    # ===== Everything within these lines are specific to the t001 test ===== #
+    # ===== Everything within these lines are specific to the t009 test ===== #
     def test_actions(self):
         """
-        Test-specific actions for T001 GPS Calibration
-        
-        Creates a 10ft x 10ft square waypoint pattern and navigates through it:
-        - Waypoint 0: (0, 0) - Starting position
-        - Waypoint 1: (10, 0) - 10 feet forward
-        - Waypoint 2: (10, -10) - 10 feet right from waypoint 1
-        - Waypoint 3: (0, -10) - 10 feet back
-        - Return to Waypoint 0: (0, 0) - Complete the square
-        
-        Robot pauses for 5 seconds at each waypoint except the final return to start.
+        Test-specific actions for T009 Rotation
+        - 
         """
-        self.get_logger().info('='*60)
-        self.get_logger().info('Starting T001 GPS Calibration Test Actions')
-        self.get_logger().info('Test Pattern: 10ft x 10ft square')
-        self.get_logger().info('='*60)
-        
-        # Convert feet to meters (1 foot = 0.3048 meters)
-        FEET_TO_METERS = 0.3048
-        
-        # Define waypoints in local coordinates (x, y in feet, converted to meters)
-        # These are relative to the robot's starting position
-        waypoint_coordinates = {
-            0: (0.0, 0.0),           # Starting position
-            1: (10.0, 0.0),          # 10 feet forward (North)
-            2: (10.0, -10.0),        # 10 feet right (East)
-            3: (0.0, -10.0),         # 10 feet back (South)
-        }
-        
-        # Create PoseStamped messages for each waypoint
-        for wp_id, (x_feet, y_feet) in waypoint_coordinates.items():
-            # Convert feet to meters
-            x_meters = x_feet * FEET_TO_METERS
-            y_meters = y_feet * FEET_TO_METERS
-            
-            pose = PoseStamped()
-            pose.header.frame_id = 'map'
-            pose.header.stamp = self.get_clock().now().to_msg()
-            pose.pose.position.x = x_meters
-            pose.pose.position.y = y_meters
-            pose.pose.position.z = 0.0
-            
-            # Set orientation (facing forward)
-            pose.pose.orientation.x = 0.0
-            pose.pose.orientation.y = 0.0
-            pose.pose.orientation.z = 0.0
-            pose.pose.orientation.w = 1.0
-            
-            self.waypoints[wp_id] = pose
-            self.get_logger().info(f'Waypoint {wp_id}: ({x_feet:.1f}ft, {y_feet:.1f}ft) = ({x_meters:.2f}m, {y_meters:.2f}m)')
-        
-        # Start navigation sequence
-        self.navigate_waypoint_sequence()
-    
-    def navigate_waypoint_sequence(self):
-        """
-        Navigate through waypoints in sequence with pauses
-        
-        Sequence:
-        1. Go to Waypoint 1, pause 5 seconds
-        2. Go to Waypoint 2, pause 5 seconds
-        3. Go to Waypoint 3, pause 5 seconds
-        4. Return to Waypoint 0 (start), stop test
-        """
-        # Waypoint sequence: 1 -> 2 -> 3 -> 0
-        sequence = [1, 2, 3, 0]
-        pause_duration = 5  # seconds
-        
-        for i, wp_id in enumerate(sequence):
-            if self.estop_triggered:
-                self.get_logger().warn('E-Stop triggered during navigation!')
-                break
-            
-            # Navigate to waypoint
-            self.get_logger().info(f'--- Navigating to Waypoint {wp_id} ---')
-            self.send_waypoint_goal(wp_id)
-            
-            # Wait for navigation to complete (simplified - in real implementation, 
-            # you would subscribe to navigation status)
-            # For now, estimate travel time based on distance and speed
-            wait_time = self.estimate_travel_time(wp_id)
-            self.get_logger().info(f'Estimated travel time: {wait_time} seconds')
-            time.sleep(wait_time)
-            
-            # Check if we reached the final waypoint (return to start)
-            if wp_id == 0:
-                self.get_logger().info('Returned to starting position - Test Complete!')
-                self.stop_test()
-                break
-            
-            # Pause at waypoint (except at final position)
-            self.get_logger().info(f'Reached Waypoint {wp_id} - Pausing for {pause_duration} seconds')
-            time.sleep(pause_duration)
-        
-        self.get_logger().info('='*60)
-        self.get_logger().info('GPS Calibration Test Actions Complete')
-        self.get_logger().info('='*60)
-    
-    def send_waypoint_goal(self, waypoint_id):
-        """Send a waypoint goal to the navigation system"""
-        if waypoint_id not in self.waypoints:
-            self.get_logger().error(f'Waypoint {waypoint_id} not found!')
-            return
-        
-        pose = self.waypoints[waypoint_id]
-        self.waypoint_pub.publish(pose)
-        self.get_logger().info(f'Published goal: Waypoint {waypoint_id}')
-    
-    def estimate_travel_time(self, target_waypoint_id):
-        """
-        Estimate travel time to reach target waypoint
-        
-        Simple estimation based on distance and assumed robot speed
-        Assumes average speed of ~0.5 m/s
-        """
-        if self.current_waypoint_index not in self.waypoints or target_waypoint_id not in self.waypoints:
-            return 30  # Default 30 seconds if we can't estimate
-        
-        current_pose = self.waypoints[self.current_waypoint_index]
-        target_pose = self.waypoints[target_waypoint_id]
-        
-        # Calculate distance
-        dx = target_pose.pose.position.x - current_pose.pose.position.x
-        dy = target_pose.pose.position.y - current_pose.pose.position.y
-        distance = (dx**2 + dy**2)**0.5
-        
-        # Estimate time (assuming 0.5 m/s average speed + 10 second buffer)
-        avg_speed = 0.5  # m/s
-        travel_time = (distance / avg_speed) + 10
-        
-        self.current_waypoint_index = target_waypoint_id
-        
-        return int(travel_time)
+        pass
     # ======================================================================= #
 
     def stop_test(self):
@@ -339,7 +203,7 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T001Automater()
+        automater = T009Automater()
         rclpy.spin(automater)
     except KeyboardInterrupt:
         pass

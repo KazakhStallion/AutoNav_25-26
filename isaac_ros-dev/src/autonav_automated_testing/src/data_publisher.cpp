@@ -53,7 +53,7 @@ private:
 public:
     DataPublisherNode() : Node("data_publisher_node"), collecting_data_(false), estop_triggered_(false) {
         // Declare parameters
-        this->declare_parameter("test_id", "t001");
+        this->declare_parameter("test_id", "");
         this->declare_parameter("topics_to_monitor", std::vector<std::string>{});
         this->declare_parameter("publish_rate", 10.0);
         
