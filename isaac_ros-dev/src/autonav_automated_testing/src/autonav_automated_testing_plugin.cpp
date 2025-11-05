@@ -62,6 +62,22 @@ AutomatedTestingWidget::AutomatedTestingWidget(QWidget *parent)
         desc->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         row->addWidget(desc);
 
+        // Add image if it exists
+        QLabel *image_label = new QLabel();
+        QString image_path = QString::fromStdString(test.image);
+        QPixmap pixmap(image_path);
+        if (!pixmap.isNull())
+        {
+            image_label->setPixmap(pixmap.scaled(100, 100, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        }
+        else
+        {
+            image_label->setText("No Image");
+            image_label->setAlignment(Qt::AlignCenter);
+        }
+        image_label->setFixedSize(100, 100);
+        row->addWidget(image_label);
+
         content_layout->addLayout(row);
     }
 
