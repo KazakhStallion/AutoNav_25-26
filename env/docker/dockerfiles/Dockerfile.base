@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       wget \
       sudo \
       nano \
+      zstd \
       bash-completion \
       pkg-config \
       # Python
