@@ -136,7 +136,7 @@ RUN python3 -m pip install --no-cache-dir protobuf
 
 SHELL ["/bin/bash", "-c"]
 RUN wget -q --no-check-certificate \
-    https://download.stereolabs.com/zedsdk/4.1/l4t36.4/jetsons \
+    https://download.stereolabs.com/zedsdk/4.2/l4t36.4/jetsons \
     -O /tmp/ZED_SDK_Linux_JP.run && \
     chmod +x /tmp/ZED_SDK_Linux_JP.run && \
     /tmp/ZED_SDK_Linux_JP.run -- silent skip_tools skip_cuda && \
