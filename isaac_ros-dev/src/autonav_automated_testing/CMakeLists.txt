@@ -40,6 +40,7 @@ target_link_libraries(autonav_automated_testing_plugin
 
 ament_target_dependencies(autonav_automated_testing_plugin
   rclcpp
+  std_msgs
   rqt_gui_cpp
   pluginlib
   ament_index_cpp
