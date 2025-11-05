@@ -38,6 +38,7 @@ public:
 
 signals:
     void status_update(const QString &status);
+    void output_ready(const QString &output);
 
 protected:
     void run() override;

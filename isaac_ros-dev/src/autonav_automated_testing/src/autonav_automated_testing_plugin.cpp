@@ -13,11 +13,40 @@ Ros2LaunchThread::Ros2LaunchThread(const QString &launch_file_path, QObject *par
 
 void Ros2LaunchThread::run()
 {
-    emit status_update("in progress");
+    emit status_update("starting");
     process_ = new QProcess();
+    
+    // Capture output for debugging
+    process_->setProcessChannelMode(QProcess::MergedChannels);
+    
     process_->start("ros2", QStringList() << "launch" << launch_file_path_);
+    
+    if (!process_->waitForStarted(5000))
+    {
+        emit status_update("failed_to_start");
+        emit output_ready("Failed to start ros2 launch command");
+        return;
+    }
+    
+    emit status_update("running");
+    
+    // Wait for process to finish (the automater will handle the test duration)
     process_->waitForFinished(-1);
-    emit status_update("completed");
+    
+    // Check exit code
+    int exit_code = process_->exitCode();
+    QString output = process_->readAll();
+    
+    emit output_ready(output);
+    
+    if (exit_code == 0)
+    {
+        emit status_update("completed");
+    }
+    else
+    {
+        emit status_update("failed");
+    }
 }
 
 void Ros2LaunchThread::stop()
@@ -26,6 +55,10 @@ void Ros2LaunchThread::stop()
     if (process_)
     {
         process_->terminate();
+        if (!process_->waitForFinished(3000))
+        {
+            process_->kill();
+        }
         emit status_update("stopped");
     }
 }
@@ -138,10 +171,50 @@ void AutomatedTestingWidget::launch_test(const TestItem &test)
     }
 
     auto *thread = new Ros2LaunchThread(launch_path);
+    
+    // Handle status updates
     connect(thread, &Ros2LaunchThread::status_update, this, [this, test](const QString &status) {
-        QMessageBox::information(this, "Status",
-                                 QString::fromStdString(test.title) + ": " + status);
+        QString message;
+        QMessageBox::Icon icon;
+        
+        if (status == "starting") {
+            message = "Starting test...";
+            icon = QMessageBox::Information;
+        } else if (status == "running") {
+            message = "Test is now running. The automater will manage the test execution.\n\n"
+                     "The test will complete automatically when finished.";
+            icon = QMessageBox::Information;
+        } else if (status == "completed") {
+            message = "Test completed successfully!";
+            icon = QMessageBox::Information;
+        } else if (status == "failed") {
+            message = "Test failed or encountered an error.\n"
+                     "This is expected if running without robot hardware.";
+            icon = QMessageBox::Warning;
+        } else if (status == "failed_to_start") {
+            message = "Failed to start the test launch file.";
+            icon = QMessageBox::Critical;
+        } else if (status == "stopped") {
+            message = "Test was stopped.";
+            icon = QMessageBox::Warning;
+        } else {
+            return; // Don't show unknown statuses
+        }
+        
+        QMessageBox msgBox(icon, QString::fromStdString(test.title), message);
+        msgBox.exec();
     });
+    
+    // Handle output (for debugging)
+    connect(thread, &Ros2LaunchThread::output_ready, this, [this, test](const QString &output) {
+        if (!output.isEmpty()) {
+            qDebug() << "Test output for" << QString::fromStdString(test.title) << ":\n" << output;
+        }
+    });
+    
+    // Clean up thread when finished
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    
     thread->start();
 }
 
