@@ -233,7 +233,7 @@ void TestOutputDialog::load_log_file()
     
     output_text_->clear();
     append_output(QString("[Load Log] Loading log file: %1").arg(log_file_path));
-    append_output("=".repeated(80));
+    append_output(QString("=").repeated(80));
     
     QTextStream in(&log_file);
     while (!in.atEnd()) {
@@ -242,7 +242,7 @@ void TestOutputDialog::load_log_file()
     }
     
     log_file.close();
-    append_output("=".repeated(80));
+    append_output(QString("=").repeated(80));
     append_output("[Load Log] Log file loaded successfully");
 }
 
