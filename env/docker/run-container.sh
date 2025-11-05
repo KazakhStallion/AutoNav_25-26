@@ -41,7 +41,7 @@ if [[ -n $SSH_AUTH_SOCK ]]; then
     DOCKER_ARGS+=("-e SSH_AUTH_SOCK=/ssh-agent")
 fi
 
-# ===== GPU & JETSON SPECIFIC =====
+# ===== JETSON SPECIFIC =====
 if [[ $PLATFORM == "aarch64" ]]; then
     echo "Detected Jetson platform (aarch64)"
     # Jetson-specific mounts and devices
@@ -57,11 +57,6 @@ if [[ $PLATFORM == "aarch64" ]]; then
     if [[ $(getent group jtop) ]]; then
         DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
     fi
-else
-    echo "Detected x86 platform"
-    # Standard GPU configuration for x86
-    DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
-    DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
 fi
 
 # ===== MOUNTS & WORKING DIRECTORY =====
