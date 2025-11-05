@@ -12,6 +12,8 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QProcess>
+#include <QDialog>
+#include <QTextEdit>
 
 #include <vector>
 #include <string>
@@ -26,6 +28,22 @@ struct TestItem
     std::string launch_file;
     std::string desc;
     std::string image;
+};
+
+class TestOutputDialog : public QDialog
+{
+    Q_OBJECT
+public:
+    explicit TestOutputDialog(const QString &test_name, QWidget *parent = nullptr);
+    
+public slots:
+    void update_status(const QString &status);
+    void append_output(const QString &output);
+
+private:
+    QLabel *status_label_;
+    QTextEdit *output_text_;
+    QPushButton *close_button_;
 };
 
 class Ros2LaunchThread : public QThread

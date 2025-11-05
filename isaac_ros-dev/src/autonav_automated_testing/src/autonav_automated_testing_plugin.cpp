@@ -4,9 +4,95 @@
 #include <QProcess>
 #include <QMessageBox>
 #include <QDebug>
+#include <QDateTime>
 
 namespace autonav_automated_testing
 {
+
+TestOutputDialog::TestOutputDialog(const QString &test_name, QWidget *parent)
+    : QDialog(parent)
+{
+    setWindowTitle("Test Output - " + test_name);
+    setMinimumSize(700, 500);
+    
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    
+    // Status label at the top
+    status_label_ = new QLabel("Status: Initializing...");
+    status_label_->setStyleSheet("QLabel { background-color: #e3f2fd; padding: 10px; "
+                                  "border: 2px solid #2196f3; border-radius: 5px; "
+                                  "font-weight: bold; font-size: 14px; }");
+    layout->addWidget(status_label_);
+    
+    // Scrollable text output area (terminal-like)
+    output_text_ = new QTextEdit();
+    output_text_->setReadOnly(true);
+    output_text_->setStyleSheet("QTextEdit { background-color: #1e1e1e; color: #d4d4d4; "
+                                 "font-family: 'Courier New', monospace; font-size: 11px; }");
+    output_text_->setLineWrapMode(QTextEdit::NoWrap);
+    layout->addWidget(output_text_);
+    
+    // Close button at the bottom
+    close_button_ = new QPushButton("Close");
+    close_button_->setEnabled(false); // Disabled until test completes
+    connect(close_button_, &QPushButton::clicked, this, &QDialog::accept);
+    layout->addWidget(close_button_);
+    
+    setLayout(layout);
+    
+    // Initial message
+    append_output(QString("[%1] Test window opened").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+}
+
+void TestOutputDialog::update_status(const QString &status)
+{
+    QString status_text;
+    QString style_color;
+    
+    if (status == "starting") {
+        status_text = "Status: Starting test...";
+        style_color = "#2196f3"; // Blue
+    } else if (status == "running") {
+        status_text = "Status: Test is running...";
+        style_color = "#ff9800"; // Orange
+    } else if (status == "completed") {
+        status_text = "Status: Test completed successfully ✓";
+        style_color = "#4caf50"; // Green
+        close_button_->setEnabled(true);
+    } else if (status == "failed") {
+        status_text = "Status: Test failed (check output below)";
+        style_color = "#f44336"; // Red
+        close_button_->setEnabled(true);
+    } else if (status == "failed_to_start") {
+        status_text = "Status: Failed to start test";
+        style_color = "#f44336"; // Red
+        close_button_->setEnabled(true);
+    } else if (status == "stopped") {
+        status_text = "Status: Test was stopped";
+        style_color = "#9e9e9e"; // Gray
+        close_button_->setEnabled(true);
+    } else {
+        status_text = "Status: " + status;
+        style_color = "#2196f3"; // Blue
+    }
+    
+    status_label_->setText(status_text);
+    status_label_->setStyleSheet(QString("QLabel { background-color: #e3f2fd; padding: 10px; "
+                                         "border: 2px solid %1; border-radius: 5px; "
+                                         "font-weight: bold; font-size: 14px; }").arg(style_color));
+    
+    append_output(QString("[%1] %2").arg(QDateTime::currentDateTime().toString("HH:mm:ss"), status_text));
+}
+
+void TestOutputDialog::append_output(const QString &output)
+{
+    output_text_->append(output);
+    // Auto-scroll to bottom
+    QTextCursor cursor = output_text_->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    output_text_->setTextCursor(cursor);
+}
+
 
 Ros2LaunchThread::Ros2LaunchThread(const QString &launch_file_path, QObject *parent)
     : QThread(parent), launch_file_path_(launch_file_path) {}
@@ -19,12 +105,20 @@ void Ros2LaunchThread::run()
     // Capture output for debugging
     process_->setProcessChannelMode(QProcess::MergedChannels);
     
+    // Connect to read output as it comes
+    connect(process_, &QProcess::readyReadStandardOutput, this, [this]() {
+        QString output = process_->readAllStandardOutput();
+        if (!output.isEmpty()) {
+            emit output_ready(output.trimmed());
+        }
+    });
+    
     process_->start("ros2", QStringList() << "launch" << launch_file_path_);
     
     if (!process_->waitForStarted(5000))
     {
         emit status_update("failed_to_start");
-        emit output_ready("Failed to start ros2 launch command");
+        emit output_ready("ERROR: Failed to start ros2 launch command");
         return;
     }
     
@@ -33,11 +127,14 @@ void Ros2LaunchThread::run()
     // Wait for process to finish (the automater will handle the test duration)
     process_->waitForFinished(-1);
     
+    // Read any remaining output
+    QString remaining = process_->readAll();
+    if (!remaining.isEmpty()) {
+        emit output_ready(remaining.trimmed());
+    }
+    
     // Check exit code
     int exit_code = process_->exitCode();
-    QString output = process_->readAll();
-    
-    emit output_ready(output);
     
     if (exit_code == 0)
     {
@@ -45,6 +142,7 @@ void Ros2LaunchThread::run()
     }
     else
     {
+        emit output_ready(QString("Process exited with code: %1").arg(exit_code));
         emit status_update("failed");
     }
 }
@@ -170,52 +268,24 @@ void AutomatedTestingWidget::launch_test(const TestItem &test)
         return;
     }
 
+    // Create the output dialog
+    auto *dialog = new TestOutputDialog(QString::fromStdString(test.title));
+    
     auto *thread = new Ros2LaunchThread(launch_path);
     
-    // Handle status updates
-    connect(thread, &Ros2LaunchThread::status_update, this, [this, test](const QString &status) {
-        QString message;
-        QMessageBox::Icon icon;
-        
-        if (status == "starting") {
-            message = "Starting test...";
-            icon = QMessageBox::Information;
-        } else if (status == "running") {
-            message = "Test is now running. The automater will manage the test execution.\n\n"
-                     "The test will complete automatically when finished.";
-            icon = QMessageBox::Information;
-        } else if (status == "completed") {
-            message = "Test completed successfully!";
-            icon = QMessageBox::Information;
-        } else if (status == "failed") {
-            message = "Test failed or encountered an error.\n"
-                     "This is expected if running without robot hardware.";
-            icon = QMessageBox::Warning;
-        } else if (status == "failed_to_start") {
-            message = "Failed to start the test launch file.";
-            icon = QMessageBox::Critical;
-        } else if (status == "stopped") {
-            message = "Test was stopped.";
-            icon = QMessageBox::Warning;
-        } else {
-            return; // Don't show unknown statuses
-        }
-        
-        QMessageBox msgBox(icon, QString::fromStdString(test.title), message);
-        msgBox.exec();
-    });
+    // Connect status updates to dialog
+    connect(thread, &Ros2LaunchThread::status_update, dialog, &TestOutputDialog::update_status);
     
-    // Handle output (for debugging)
-    connect(thread, &Ros2LaunchThread::output_ready, this, [this, test](const QString &output) {
-        if (!output.isEmpty()) {
-            qDebug() << "Test output for" << QString::fromStdString(test.title) << ":\n" << output;
-        }
-    });
+    // Connect output to dialog
+    connect(thread, &Ros2LaunchThread::output_ready, dialog, &TestOutputDialog::append_output);
     
-    // Clean up thread when finished
+    // Clean up thread and dialog when finished
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
     
+    // Start the thread and show the dialog
     thread->start();
+    dialog->show();
 }
 
 Plugin::Plugin() : rqt_gui_cpp::Plugin()
