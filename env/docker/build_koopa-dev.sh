@@ -16,7 +16,7 @@ if docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
   docker rmi "$IMAGE_REF"
 fi
 
-# Nuild the dev image
+# Build the dev image
 docker build -t "$IMAGE_REF" \
   -f "$HOME/AutoNav_25-26/env/docker/dockerfiles/Dockerfile" \
   "$HOME/AutoNav_25-26"

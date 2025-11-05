@@ -1,74 +1,132 @@
-# ============================
-# Base image: autonav:koopa-kingdom (Ubuntu 22.04 / ROS 2 Humble)
-# ============================
-FROM ubuntu:22.04
+# ============================================
+# Base Dockerfile: JetPack / L4T r36.4.0 (JP 6.x series)
+# ============================================
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# Basic toolchain + common dev packages + OpenCV dev + Python libs
-RUN set -eux; \
-    # Use ARM64 ports mirror
-    sed -i 's|archive.ubuntu.com|ports.ubuntu.com|g' /etc/apt/sources.list; \
-    apt-get update; \
-    # tools needed before add-apt-repository
-    apt-get install -y --no-install-recommends \
-      ca-certificates gnupg lsb-release software-properties-common; \
-    # enable universe (needed for python3-opencv, etc.)
-    add-apt-repository -y universe; \
-    apt-get update; \
-    # core toolchain + common libs
-    apt-get install -y --no-install-recommends \
-      build-essential cmake git curl wget sudo nano bash-completion pkg-config \
-      python3-pip \
-      libopencv-dev python3-opencv python3-numpy \
-      libasio-dev libpcap0.8-dev libusb-1.0-0-dev; \
-    rm -rf /var/lib/apt/lists/*; \
-    # Python tools via pip
-    python3 -m pip install --no-cache-dir -U pip; \
-    python3 -m pip install --no-cache-dir rosdep vcstool colcon-common-extensions; \
-    # Initialize rosdep database
-    rosdep init || true; \
-    rosdep update || true
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-# Add ROS 2 APT repo and install ROS Humble (Jammy) + common packages
+# Core dev tools, codecs, GStreamer, V4L2, OpenCV, Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      # base
+      ca-certificates \
+      gnupg \
+      lsb-release \
       software-properties-common \
- && add-apt-repository -y universe \
- && curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-      -o /usr/share/keyrings/ros-archive-keyring.gpg \
- && sh -c 'echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
-      http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > \
-      /etc/apt/sources.list.d/ros2.list' \
- && apt-get update && apt-get install -y --no-install-recommends \
-      ros-humble-ros-base \
-      ros-humble-cv-bridge \
-      ros-humble-tf-transformations \
-      ros-humble-image-transport \
-      ros-humble-point-cloud-transport \
-      ros-humble-rclcpp \
-      ros-humble-rclcpp-components \
-      ros-humble-tf2-ros \
-      ros-humble-tf2-geometry-msgs \
-      ros-humble-geometry-msgs \
-      ros-humble-nav-msgs \
-      ros-humble-sensor-msgs \
-      ros-humble-joint-state-publisher \
-      ros-humble-xacro \
-      ros-humble-ros2-control \
-      ros-humble-ros2-controllers \
+      build-essential \
+      cmake \
+      git \
+      curl \
+      wget \
+      sudo \
+      nano \
+      bash-completion \
+      pkg-config \
+      # Python
+      python3-pip \
+      python3-numpy \
+      python3-dev \
+      # OpenCV (C++/Python)
+      libopencv-dev \
+      python3-opencv \
+      # multimedia / camera / codecs
+      v4l-utils \
+      gstreamer1.0-tools \
+      gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+      gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+      gstreamer1.0-libav \
+      libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+      # low-level I/O for sensors
+      libasio-dev libpcap0.8-dev libusb-1.0-0-dev \
+      # C++ libs commonly needed by robotics stacks
+      libeigen3-dev \
+      libboost-all-dev \
+      libyaml-cpp-dev \
+      libfmt-dev \
+      libspdlog-dev \
+      libprotobuf-dev \
+      protobuf-compiler \
+      libtinyxml2-dev \
+      libtbb-dev \
+      libgoogle-glog-dev \
+      libgflags-dev \
+      libceres-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Install ZED SDK for Jetson inside the container.
+
+# ROS 2 Humble (Jammy) – perception, Nav2, PCL, etc.
+RUN add-apt-repository -y universe \
+ && curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg \
+ && echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+      http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
+      > /etc/apt/sources.list.d/ros2.list \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      # base/runtime
+      ros-humble-ros-base \
+      ros-humble-rclcpp ros-humble-rclcpp-components \
+      ros-humble-tf2-ros ros-humble-tf2-geometry-msgs \
+      ros-humble-geometry-msgs ros-humble-nav-msgs ros-humble-sensor-msgs \
+      ros-humble-diagnostics ros-humble-diagnostic-updater \
+      ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
+      ros-humble-xacro ros-humble-angles \
+      # perception / PCL / image pipeline
+      ros-humble-image-transport ros-humble-camera-info-manager \
+      ros-humble-cv-bridge ros-humble-image-pipeline \
+      ros-humble-pcl-ros ros-humble-pcl-conversions \
+      ros-humble-pointcloud-to-laserscan ros-humble-point-cloud-transport \
+      # control
+      ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-joy \
+      # navigation
+      ros-humble-navigation2 ros-humble-nav2-bringup \
+      # tooling / GUI
+      ros-humble-rqt ros-humble-rqt-common-plugins \
+      ros-humble-rviz2 \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# Gazebo Classic: OSRF repo + gazebo + gazebo-ros
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+ && wget -O - https://packages.osrfoundation.org/gazebo.gpg \
+      | tee /usr/share/keyrings/gazebo-archive-keyring.gpg > /dev/null \
+ && echo "deb [signed-by=/usr/share/keyrings/gazebo-archive-keyring.gpg] \
+      http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+      > /etc/apt/sources.list.d/gazebo-stable.list \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      gazebo \
+      ros-humble-gazebo-ros-pkgs \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# Jetson vision (VPI)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      nvidia-vpi vpi3-dev vpi3-samples \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
+# ROS dev tooling via pip (arm64-friendly) + Py scientific stack
+RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
+ && python3 -m pip install --no-cache-dir \
+      rosdep vcstool colcon-common-extensions \
+      empy pybind11 \
+      numpy scipy matplotlib \
+ && rosdep init || true && rosdep update || true
+
+
+# ZED SDK (Jetson)
 COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/jetson_download_and_install_sdk.sh
 RUN chmod +x /tmp/jetson_download_and_install_sdk.sh && \
     /tmp/jetson_download_and_install_sdk.sh 6 2 36 4 4 1 || true && \
     rm -f /tmp/jetson_download_and_install_sdk.sh
 
-# Keep rosdep data available for later installs (best-effort)
-RUN rosdep update || true
 
-# Default shell
+# ROS autosource for interactive shells
+RUN printf '%s\n' \
+  '[ -f /opt/ros/humble/setup.bash ] && source /opt/ros/humble/setup.bash' \
+  > /etc/profile.d/ros_humble.sh
+
 CMD ["/bin/bash"]
