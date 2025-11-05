@@ -5,8 +5,8 @@ set -e # makes script exit on command failure
 # ===== PARAMETERS =====
 IMAGE_TAG="dev:koopa-kingdom"
 CONTAINER_NAME="koopa-kingdom"
-HOST_WORKDIR="$HOME/AutoNav_25-26"  # Directory on Jetson
-CONTAINER_WORKDIR="/autonav"        # Inside container
+HOST_WORKDIR="$HOME/AutoNav_25-26"
+CONTAINER_WORKDIR="/autonav"
 ENTRYPOINT="/usr/local/bin/scripts/entrypoint.sh"
 SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
 
@@ -30,10 +30,6 @@ DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
 DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
 
-# ===== GPU =====
-DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
-DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
-
 # ===== DISPLAY FORWARDING =====
 DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
 DOCKER_ARGS+=("-v $HOME/.Xauthority:/home/${USERNAME}/.Xauthority:rw")
@@ -45,9 +41,10 @@ if [[ -n $SSH_AUTH_SOCK ]]; then
     DOCKER_ARGS+=("-e SSH_AUTH_SOCK=/ssh-agent")
 fi
 
-# ===== JETSON SPECIFIC =====
+# ===== GPU & JETSON SPECIFIC =====
 if [[ $PLATFORM == "aarch64" ]]; then
-    DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=nvidia.com/gpu=all,nvidia.com/pva=all")
+    echo "Detected Jetson platform (aarch64)"
+    # Jetson-specific mounts and devices
     DOCKER_ARGS+=("-v /usr/bin/tegrastats:/usr/bin/tegrastats")
     DOCKER_ARGS+=("-v /tmp/:/tmp/")
     DOCKER_ARGS+=("-v /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra")
@@ -55,24 +52,26 @@ if [[ $PLATFORM == "aarch64" ]]; then
     DOCKER_ARGS+=("--pid=host")
     DOCKER_ARGS+=("-v /usr/share/vpi3:/usr/share/vpi3")
     DOCKER_ARGS+=("-v /dev:/dev")
-
+    
+    # jtop support
     if [[ $(getent group jtop) ]]; then
         DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
     fi
+else
+    echo "Detected x86 platform"
+    # Standard GPU configuration for x86
+    DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
+    DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
 fi
 
 # ===== MOUNTS & WORKING DIRECTORY =====
 DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
-
-# Set working directory inside container
 DOCKER_ARGS+=("--workdir ${CONTAINER_WORKDIR}/isaac_ros-dev")
-
-# Mount entrypoint scripts
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
 
-# ZED settings/resources (check if they exist)
+# ZED settings/resources
 if [[ -d "$HOME/zed/settings" ]]; then
     DOCKER_ARGS+=("-v $HOME/zed/settings:/usr/local/zed/settings")
 fi
