@@ -1,6 +1,8 @@
 #pragma once
 
 #include <rqt_gui_cpp/plugin.h>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <QWidget>
 #include <QThread>
 #include <QPushButton>
@@ -17,6 +19,7 @@
 
 #include <vector>
 #include <string>
+#include <memory>
 
 namespace autonav_automated_testing
 {
@@ -34,16 +37,23 @@ class TestOutputDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit TestOutputDialog(const QString &test_name, QWidget *parent = nullptr);
+    explicit TestOutputDialog(const QString &test_name, const std::string &test_id, QWidget *parent = nullptr);
     
 public slots:
     void update_status(const QString &status);
     void append_output(const QString &output);
+    void trigger_estop();
+    void load_log_file();
 
 private:
     QLabel *status_label_;
     QTextEdit *output_text_;
     QPushButton *close_button_;
+    QPushButton *estop_button_;
+    QPushButton *load_log_button_;
+    std::string test_id_;
+    rclcpp::Node::SharedPtr node_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr estop_pub_;
 };
 
 class Ros2LaunchThread : public QThread
