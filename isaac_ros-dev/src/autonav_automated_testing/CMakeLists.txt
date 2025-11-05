@@ -25,6 +25,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 # RQT Plugin Library
 add_library(autonav_automated_testing_plugin SHARED
   src/autonav_automated_testing_plugin.cpp
+  include/autonav_automated_testing/autonav_automated_testing_plugin.hpp
 )
 
 target_include_directories(autonav_automated_testing_plugin PUBLIC
