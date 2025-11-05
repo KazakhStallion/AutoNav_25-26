@@ -83,15 +83,41 @@ RUN add-apt-repository -y universe \
       ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-joy \
       # navigation
       ros-humble-navigation2 ros-humble-nav2-bringup \
+      # SLAM
+      ros-humble-slam-toolbox \
+      # GPS/GNSS messages
+      ros-humble-geographic-msgs ros-humble-nmea-msgs \
       # tooling / GUI
       ros-humble-rqt ros-humble-rqt-common-plugins \
       ros-humble-rviz2 \
  && rm -rf /var/lib/apt/lists/*
 
 
+# Isaac ROS packages (if needed - remove if not using)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-humble-isaac-ros-common \
+      ros-humble-isaac-ros-visual-slam \
+      ros-humble-isaac-ros-image-pipeline \
+      ros-humble-isaac-ros-apriltag \
+      ros-humble-isaac-ros-dnn-inference \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
 # Jetson vision (VPI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       nvidia-vpi vpi3-dev vpi3-samples \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
+# GPS/GNSS support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      gpsd libgps-dev python3-gps \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# SLAM additional dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libg2o-dev \
  && rm -rf /var/lib/apt/lists/* || true
 
 
@@ -101,6 +127,7 @@ RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
       rosdep vcstool colcon-common-extensions \
       empy pybind11 \
       numpy scipy matplotlib \
+      scikit-image \
  && rosdep init || true && rosdep update || true
 
 
