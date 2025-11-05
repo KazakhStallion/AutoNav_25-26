@@ -89,19 +89,6 @@ RUN add-apt-repository -y universe \
  && rm -rf /var/lib/apt/lists/*
 
 
-# Gazebo Classic: OSRF repo + gazebo + gazebo-ros
-RUN apt-get update && apt-get install -y --no-install-recommends wget \
- && wget -O - https://packages.osrfoundation.org/gazebo.gpg \
-      | tee /usr/share/keyrings/gazebo-archive-keyring.gpg > /dev/null \
- && echo "deb [signed-by=/usr/share/keyrings/gazebo-archive-keyring.gpg] \
-      http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
-      > /etc/apt/sources.list.d/gazebo-stable.list \
- && apt-get update && apt-get install -y --no-install-recommends \
-      gazebo \
-      ros-humble-gazebo-ros-pkgs \
- && rm -rf /var/lib/apt/lists/*
-
-
 # Jetson vision (VPI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       nvidia-vpi vpi3-dev vpi3-samples \
