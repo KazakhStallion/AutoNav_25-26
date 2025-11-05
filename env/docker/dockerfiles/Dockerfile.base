@@ -132,15 +132,18 @@ RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
 
 
 # ZED SDK (Jetson)
-# COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/jetson_download_and_install_sdk.sh
-# RUN chmod +x /tmp/jetson_download_and_install_sdk.sh && \
-#     /tmp/jetson_download_and_install_sdk.sh 6 2 36 4 4 1 || true && \
-#     rm -f /tmp/jetson_download_and_install_sdk.sh
-# ZED SDK (Jetson)
-COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/jetson_download_and_install_sdk.sh
-RUN chmod +x /tmp/jetson_download_and_install_sdk.sh && \
-    /tmp/jetson_download_and_install_sdk.sh 6 2 36 4 4 1 && \
-    rm -f /tmp/jetson_download_and_install_sdk.sh
+RUN python3 -m pip install --no-cache-dir protobuf
+
+SHELL ["/bin/bash", "-c"]
+RUN wget -q --no-check-certificate \
+    https://download.stereolabs.com/zedsdk/4.1/l4t36.4/jetsons \
+    -O /tmp/ZED_SDK_Linux_JP.run && \
+    chmod +x /tmp/ZED_SDK_Linux_JP.run && \
+    /tmp/ZED_SDK_Linux_JP.run -- silent skip_tools skip_cuda && \
+    rm -f /tmp/ZED_SDK_Linux_JP.run && \
+    ldconfig
+
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # Verify ZED SDK installed and group was created
 RUN which /usr/local/zed/tools/ZED_Diagnostic || echo "WARNING: ZED SDK may not be installed" && \
