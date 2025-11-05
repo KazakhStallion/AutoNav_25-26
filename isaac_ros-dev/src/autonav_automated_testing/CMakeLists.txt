@@ -8,6 +8,7 @@ endif()
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -41,6 +42,7 @@ ament_target_dependencies(autonav_automated_testing_plugin
   rclcpp
   rqt_gui_cpp
   pluginlib
+  ament_index_cpp
 )
 
 # Data Publisher Executable
@@ -75,7 +77,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION include/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch config
+install(DIRECTORY launch config images
   DESTINATION share/${PROJECT_NAME}
 )
 

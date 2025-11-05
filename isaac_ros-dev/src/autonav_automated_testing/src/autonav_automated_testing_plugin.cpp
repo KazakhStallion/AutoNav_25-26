@@ -1,5 +1,6 @@
 #include "autonav_automated_testing/autonav_automated_testing_plugin.hpp"
 #include <pluginlib/class_list_macros.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <QProcess>
 #include <QMessageBox>
 #include <QDebug>
@@ -72,13 +73,40 @@ AutomatedTestingWidget::AutomatedTestingWidget(QWidget *parent)
 
 void AutomatedTestingWidget::populateTests()
 {
+    // Get the package share directory to find images
+    std::string package_share_dir;
+    try {
+        package_share_dir = ament_index_cpp::get_package_share_directory("autonav_automated_testing");
+    } catch (const std::exception& e) {
+        qDebug() << "Failed to find package share directory:" << e.what();
+        package_share_dir = "";
+    }
+    
+    std::string image_dir = package_share_dir + "/images/";
+    
     tests_ = {
-        {"[Test ID: 001]", "GPS Calibration Test", "t001_GPS_Cal.launch.py",
-         "Ensure open area for GPS calibration.", "t001.jpg"},
-        {"[Test ID: 002]", "Line Compliance Test", "t002_Line_Comp.launch.py",
-         "Robot follows a straight line.", "t002.jpg"},
-        {"[Test ID: 003]", "Forward Movement Test", "t003_Forward_Move.launch.py",
-         "Robot moves forward on flat surface.", "t003.jpg"},
+        {"[Test ID: t001]", "GPS Calibration Test", "t001_GPS_Cal.launch.py",
+         "Ensure open area for GPS calibration.", image_dir + "t001.jpg"},
+        {"[Test ID: t002]", "Line Compliance Test", "t002_Line_Comp.launch.py",
+         "Robot follows a straight line.", image_dir + "t002.jpg"},
+        {"[Test ID: t003]", "Forward Movement Test", "t003_Forward_Move.launch.py",
+         "Robot moves forward on flat surface.", image_dir + "t003.jpg"},
+        {"[Test ID: t004]", "Object Detection Test", "t004_Obj_Detect.launch.py",
+         "Test object detection capabilities.", image_dir + "t004.jpg"},
+        {"[Test ID: t005]", "Path Planning Test", "t005_Path_Plan.launch.py",
+         "Test autonomous path planning.", image_dir + "t005.jpg"},
+        {"[Test ID: t006]", "Simulation Test", "t006_Simulation.launch.py",
+         "Run robot in simulation environment.", image_dir + "t006.jpg"},
+        {"[Test ID: t007]", "Speed Test", "t007_Speed.launch.py",
+         "Test robot speed performance.", image_dir + "t007.jpg"},
+        {"[Test ID: t008]", "Acceleration Test", "t008_Acceleration.launch.py",
+         "Test robot acceleration performance.", image_dir + "t008.jpg"},
+        {"[Test ID: t009]", "Rotation Test", "t009_Rotation.launch.py",
+         "Test robot rotation capabilities.", image_dir + "t009.jpg"},
+        {"[Test ID: t010]", "Steering Drift Test", "t010_Steering_Drift.launch.py",
+         "Test steering accuracy and drift.", image_dir + "t010.jpg"},
+        {"[Test ID: t011]", "Incline Performance Test", "t011_Incline_Performance.launch.py",
+         "Test robot performance on inclines.", image_dir + "t011.jpg"},
     };
 }
 
