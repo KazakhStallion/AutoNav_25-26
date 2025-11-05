@@ -1,4 +1,5 @@
 #include "autonav_automated_testing/autonav_automated_testing_plugin.hpp"
+#include <pluginlib/class_list_macros.hpp>
 #include <QProcess>
 #include <QMessageBox>
 #include <QDebug>
@@ -112,5 +113,7 @@ void Plugin::initPlugin(qt_gui_cpp::PluginContext &context)
 }
 
 } // namespace autonav_automated_testing
+
+PLUGINLIB_EXPORT_CLASS(autonav_automated_testing::Plugin, rqt_gui_cpp::Plugin)
 
 #include "autonav_automated_testing_plugin.moc"
