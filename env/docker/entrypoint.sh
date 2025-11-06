@@ -37,7 +37,11 @@ adduser ${USERNAME} sudo  >/dev/null
 adduser ${USERNAME} dialout  >/dev/null
 adduser ${USERNAME} bluetooth  >/dev/null
 adduser ${USERNAME} systemd-journal >/dev/null
-adduser ${USERNAME} zed >/dev/null
+if getent group zed >/dev/null 2>&1; then
+  adduser ${USERNAME} zed >/dev/null 2>&1 || true
+else
+  echo "WARNING: zed group not found"
+fi
 
 source /opt/ros/humble/setup.bash # source ros setup
 
