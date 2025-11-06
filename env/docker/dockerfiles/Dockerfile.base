@@ -144,13 +144,9 @@ RUN wget -q --no-check-certificate \
     rm -f /tmp/ZED_SDK_Linux_JP.run && \
     ldconfig
 
-# Verify ZED SDK installation
-RUN echo "=== ZED SDK Verification ===" && \
-    ls -la /usr/local/zed/ 2>/dev/null || echo "ERROR: /usr/local/zed not found" && \
-    which /usr/local/zed/tools/ZED_Diagnostic 2>/dev/null || echo "WARNING: ZED_Diagnostic not found" && \
-    getent group zed || echo "WARNING: zed group not created by installer" && \
-    ldconfig -p | grep libsl_zed || echo "WARNING: ZED libraries not in ldconfig" && \
-    echo "=== End Verification ==="
+# Change ZED SDK folder group GID to 2100 cuz conflicts with Admin:1000
+RUN groupmod -g 2100 zed && \
+    chgrp -R 2100 /usr/local/zed
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
