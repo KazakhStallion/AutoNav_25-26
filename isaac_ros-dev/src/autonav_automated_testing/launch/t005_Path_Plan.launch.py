@@ -64,11 +64,9 @@ def generate_launch_description():
     # Execute the test automater script
     # This script handles test orchestration, data collection, and log file generation
     automater_script_path = os.path.join(
-        os.path.dirname(autonav_testing_share),
-        '..',
-        '..',
-        'scripts',
-        'automatic_testing',
+        autonav_testing_share,
+        'src',
+        'automaters',
         't005_automater.py'
     )
     

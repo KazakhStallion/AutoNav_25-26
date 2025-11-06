@@ -78,7 +78,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION include/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch config images
+install(DIRECTORY launch config images src
   DESTINATION share/${PROJECT_NAME}
 )
 
