@@ -122,9 +122,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* || true
 
 
+# Python packaging toolchain
+RUN python3 -m pip install --no-cache-dir -U \
+      "pip==24.2" \
+      "setuptools==70.0.0" \
+      "wheel==0.44.0" \
+      "packaging==24.2"
+
 # ROS dev tooling via pip (arm64-friendly) + Py scientific stack
-RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
- && python3 -m pip install --no-cache-dir \
+RUN python3 -m pip install --no-cache-dir \
       rosdep vcstool colcon-common-extensions \
       empy pybind11 \
       numpy scipy matplotlib \
@@ -133,6 +139,7 @@ RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
 
 # Let anyone read installed Python packages
 RUN chmod -R a+rX /usr/local/lib/python3.10/dist-packages/
+
 
 # ZED SDK (Jetson)
 RUN python3 -m pip install --no-cache-dir protobuf
