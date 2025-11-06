@@ -78,12 +78,18 @@ class BaseAutomater(Node):
             self.stop_test()
             return
         
-        # Start test at t=2s (give nodes time to initialize)
-        if self.elapsed_time == 2 and not self.test_started:
+        # Countdown to test start (10 second delay)
+        if self.elapsed_time <= 10 and not self.test_started:
+            remaining_time = 10 - self.elapsed_time
+            if remaining_time > 0:
+                self.get_logger().info(f'Test starting in {remaining_time} seconds...')
+        
+        # Start test at t=10s (10 second delay for preparation)
+        if self.elapsed_time == 10 and not self.test_started:
             self.start_test()
         
         # Start test-specific actions after test is started
-        if self.test_started and not self.test_actions_started and self.elapsed_time == 5:
+        if self.test_started and not self.test_actions_started and self.elapsed_time == 13:
             self.test_actions_started = True
             self.test_actions()
         

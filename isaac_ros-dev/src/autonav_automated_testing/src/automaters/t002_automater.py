@@ -129,9 +129,6 @@ class T002Automater(BaseAutomater):
         return R * c
     # ======================================================================= #
 
-
-
-
 def main(args=None):
     rclpy.init(args=args)
     
