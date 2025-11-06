@@ -131,6 +131,8 @@ RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
       scikit-image \
  && rosdep init || true && rosdep update || true
 
+# Let anyone read installed Python packages
+RUN chmod -R a+rX /usr/local/lib/python3.10/dist-packages/
 
 # ZED SDK (Jetson)
 RUN python3 -m pip install --no-cache-dir protobuf
