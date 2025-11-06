@@ -25,16 +25,19 @@ TEST Briefing (T002):
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import NavSatFix
 from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
+import math
 import csv
 import os
 import time
 from datetime import datetime
 from pathlib import Path
 
-class T001Automater(Node):
+class T002Automater(Node):
     def __init__(self):
         super().__init__('t002_automater')
         
@@ -50,7 +53,18 @@ class T001Automater(Node):
         self.collected_data = []
 
         # ===== Specific Variables related to executing the test_actions() ===== #
-
+        # Distance tracking variables
+        self.start_gps_position = None
+        self.current_gps_position = None
+        self.start_odom_position = None
+        self.current_odom_position = None
+        self.gps_distance_traveled = 0.0
+        self.odom_distance_traveled = 0.0
+        self.target_distance_ft = 110.0  # 110 feet target
+        self.target_distance_m = self.target_distance_ft * 0.3048  # Convert to meters
+        
+        # Line following control
+        self.line_following_active = False
         # ====================================================================== #
         
         # Create log directory and file !!!(Change this later to store on Jetson)!!!
@@ -73,9 +87,14 @@ class T001Automater(Node):
             String, '/estop', self.estop_callback, 10)
         
         # ===== Test Specific Publishers  ===== #
+        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         # ===== Test Specific Publishers  ===== #
 
         # ===== Test Specific Subscribers ===== #
+        self.gps_sub = self.create_subscription(
+            NavSatFix, '/gps/fix', self.gps_callback, 10)
+        self.odom_sub = self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10)
         # ===== Test Specific Subscribers ===== #
         
         # Timer to manage test flow and serves as watchdog
@@ -102,7 +121,7 @@ class T001Automater(Node):
                 'timestamp', 'gps_lat', 'gps_lon', 'gps_alt',
                 'odom_x', 'odom_y', 'odom_theta',
                 'cmd_vel_linear', 'cmd_vel_angular',
-                'encoder_data'
+                'encoder_data', 'imu_data', 'lidar_scan', 'line_detection'
             ])
 
     def test_manager(self):
@@ -123,7 +142,15 @@ class T001Automater(Node):
             self.test_actions_started = True
             self.test_actions()
         
-        # Check for test completion conditions
+        # ===== Test Specific Completion Condition ===== #
+        # Check if we've traveled the target distance
+        if (self.gps_distance_traveled >= self.target_distance_m or 
+            self.odom_distance_traveled >= self.target_distance_m):
+            self.get_logger().info(f'Target distance reached! GPS: {self.gps_distance_traveled:.2f}m, Odom: {self.odom_distance_traveled:.2f}m')
+            self.stop_test()
+            return
+        # ============================================== #
+             
         if self.elapsed_time > self.timeout:
             self.get_logger().info('Test duration limit reached')
             self.stop_test()
@@ -143,9 +170,68 @@ class T001Automater(Node):
     def test_actions(self):
         """
         Test-specific actions for T002 Line Compliance
-        - 
+        - Start line following behavior
+        - Robot should stay between white lines using camera input
+        - Continue until 110ft distance is traveled
         """
-        pass
+        self.get_logger().info('Starting line compliance test - robot will follow white lines')
+        self.line_following_active = True
+        
+        # Send initial forward command to start moving
+        # The line detection and control should take over from the bringup launch
+        initial_cmd = Twist()
+        initial_cmd.linear.x = 0.5  # Start with slow forward motion
+        initial_cmd.angular.z = 0.0
+        self.cmd_vel_pub.publish(initial_cmd)
+        
+        self.get_logger().info('Line following activated - bringup.launch.py should handle line detection and control')
+
+    def gps_callback(self, msg: NavSatFix):
+        """Track GPS position for distance calculation"""
+        if msg.status.status >= 0:  # Valid GPS fix
+            self.current_gps_position = msg
+            
+            if self.start_gps_position is None and self.test_started:
+                self.start_gps_position = msg
+                self.get_logger().info(f'GPS starting position set: {msg.latitude:.6f}, {msg.longitude:.6f}')
+            elif self.start_gps_position is not None:
+                # Calculate distance using Haversine formula
+                self.gps_distance_traveled = self.calculate_gps_distance(
+                    self.start_gps_position, self.current_gps_position)
+                
+                # Log progress every 10 meters
+                if int(self.gps_distance_traveled) % 10 == 0 and int(self.gps_distance_traveled) > 0:
+                    distance_ft = self.gps_distance_traveled / 0.3048
+                    self.get_logger().info(f'GPS Distance: {self.gps_distance_traveled:.1f}m ({distance_ft:.1f}ft)')
+
+    def odom_callback(self, msg: Odometry):
+        """Track odometry position for distance calculation"""
+        self.current_odom_position = msg
+        
+        if self.start_odom_position is None and self.test_started:
+            self.start_odom_position = msg
+            self.get_logger().info('Odometry starting position set')
+        elif self.start_odom_position is not None:
+            # Calculate distance from odometry
+            dx = msg.pose.pose.position.x - self.start_odom_position.pose.pose.position.x
+            dy = msg.pose.pose.position.y - self.start_odom_position.pose.pose.position.y
+            self.odom_distance_traveled = math.sqrt(dx*dx + dy*dy)
+
+    def calculate_gps_distance(self, start_pos: NavSatFix, current_pos: NavSatFix) -> float:
+        """Calculate distance between two GPS positions using Haversine formula"""
+        R = 6371000  # Earth's radius in meters
+        
+        lat1 = math.radians(start_pos.latitude)
+        lat2 = math.radians(current_pos.latitude)
+        dlat = math.radians(current_pos.latitude - start_pos.latitude)
+        dlon = math.radians(current_pos.longitude - start_pos.longitude)
+        
+        a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+             math.cos(lat1) * math.cos(lat2) * 
+             math.sin(dlon/2) * math.sin(dlon/2))
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        return R * c
     # ======================================================================= #
 
     def stop_test(self):
@@ -197,14 +283,20 @@ class T001Automater(Node):
             writer.writerow([])
             writer.writerow(['# End Time:', datetime.now().isoformat()])
             writer.writerow(['# Total Data Points:', len(self.collected_data)])
+            writer.writerow(['# GPS Distance Traveled (m):', f'{self.gps_distance_traveled:.2f}'])
+            writer.writerow(['# GPS Distance Traveled (ft):', f'{self.gps_distance_traveled/0.3048:.2f}'])
+            writer.writerow(['# Odom Distance Traveled (m):', f'{self.odom_distance_traveled:.2f}'])
+            writer.writerow(['# Odom Distance Traveled (ft):', f'{self.odom_distance_traveled/0.3048:.2f}'])
+            writer.writerow(['# Target Distance (ft):', self.target_distance_ft])
             writer.writerow(['# E-Stop Triggered:', self.estop_triggered])
+            writer.writerow(['# Test Completed Successfully:', self.gps_distance_traveled >= self.target_distance_m or self.odom_distance_traveled >= self.target_distance_m])
 
 
 def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T001Automater()
+        automater = T002Automater()
         rclpy.spin(automater)
     except KeyboardInterrupt:
         pass
