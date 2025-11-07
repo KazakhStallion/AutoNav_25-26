@@ -12,7 +12,6 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(autonav_interfaces REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -57,7 +56,6 @@ ament_target_dependencies(line_detector
   rclcpp
   autonav_interfaces
   cv_bridge
-  OpenCV
   tf2_ros
   tf2_eigen
   Eigen3
