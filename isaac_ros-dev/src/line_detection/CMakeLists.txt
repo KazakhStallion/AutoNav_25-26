@@ -1,16 +1,13 @@
-cmake_minimum_required(VERSION 3.8)
-project(line_detection)
+cmake_minimum_required(VERSION 3.18)  # 3.18+ recommended for CUDA language
+project(line_detection LANGUAGES CXX CUDA)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+# Warnings for host code
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# ---- ROS & deps ----
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(autonav_interfaces REQUIRED)
@@ -19,62 +16,94 @@ find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(CUDA REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-# set arch and nvcc flags
-set(CMAKE_CUDA_ARCHITECTURES 60)
-set(CMAKE_CUDA_FLAGS "${CUDA_NVCC_FLAGS} --generate-code=arch=compute_60,code=sm_60")
+# ---- CUDA Toolchain (modern) ----
+enable_language(CUDA)
+find_package(CUDAToolkit REQUIRED)
 
+# Jetson Orin Nano is Ampere (SM 87)
+# CMake will pass -gencode flags accordingly; no need to hand-write NVCC flags.
+set(CMAKE_CUDA_ARCHITECTURES 87)
 
-# create executable target
-file(GLOB SRC_FILES src/*.cpp src/*.cu) # glob haha
-cuda_add_executable(line_detector ${SRC_FILES})
+# (Optional) CUDA compile flags for better debugability; comment if not needed.
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
 
-
-# set include paths
-ament_target_dependencies(line_detector rclcpp autonav_interfaces cv_bridge OpenCV tf2_ros tf2_eigen Eigen3 image_geometry tf2_geometry_msgs)
-
-# target local library
-target_include_directories(line_detector PRIVATE
- ${CMAKE_CURRENT_SOURCE_DIR}
- ${image_geometry_INCLUDE_DIRS} 
- ${tf2_geometry_msgs_INCLUDE_DIRS})
-
-target_include_directories(line_detector PUBLIC 
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<INSTALL_INTERFACE:include>
+# ---- Sources ----
+file(GLOB SRC_FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu
 )
 
+add_executable(line_detector ${SRC_FILES})
 
+# C++ standard
+target_compile_features(line_detector PUBLIC cxx_std_17)
 
-# link targeted libraries
+# Position-independent code (shared objects friendliness)
+set_target_properties(line_detector PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_link_libraries(line_detector 
-                      ${CUDA_LIBRARIES}
-                      nppist
-                        # For image processing
+# ---- Includes ----
+target_include_directories(line_detector
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${image_geometry_INCLUDE_DIRS}
+    ${tf2_geometry_msgs_INCLUDE_DIRS}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
+# ---- ROS/ament deps ----
+ament_target_dependencies(line_detector
+  rclcpp
+  autonav_interfaces
+  cv_bridge
+  OpenCV
+  tf2_ros
+  tf2_eigen
+  Eigen3
+  image_geometry
+  tf2_geometry_msgs
+)
 
+# ---- Link CUDA & NPP (modern imported targets) ----
+# nppist often depends on nppc; link both.
+set(_cuda_npp_targets CUDA::cudart CUDA::nppist CUDA::nppc)
 
+# Fallback if CUDAToolkit imported targets don’t define nppist on this CMake/Toolkit combo.
+foreach(tgt IN LISTS _cuda_npp_targets)
+  if(NOT TARGET ${tgt})
+    # Fallback to absolute libraries if necessary (rare on JP6, but safe)
+    # We prefer the canonical aarch64 targets path on Jetson:
+    list(APPEND _cuda_fallback_libs
+      /usr/local/cuda/targets/aarch64-linux/lib/libcudart.so
+      /usr/local/cuda/targets/aarch64-linux/lib/libnppist.so
+      /usr/local/cuda/targets/aarch64-linux/lib/libnppc.so
+    )
+    set(_use_fallback_libs TRUE)
+    break()
+  endif()
+endforeach()
 
-# install
-install(TARGETS 
-    line_detector
-    DESTINATION lib/${PROJECT_NAME})
+if(_use_fallback_libs)
+  target_link_libraries(line_detector PRIVATE ${_cuda_fallback_libs})
+  # Bake rpath so the binary finds CUDA libs at runtime
+  target_link_options(line_detector PRIVATE -Wl,-rpath,/usr/local/cuda/targets/aarch64-linux/lib)
+else()
+  target_link_libraries(line_detector PRIVATE ${_cuda_npp_targets})
+  # Many JetPack images already have loader paths set, but bake rpath for robustness
+  target_link_options(line_detector PRIVATE -Wl,-rpath,$<TARGET_FILE_DIR:CUDA::cudart>)
+endif()
 
+# ---- Install ----
+install(TARGETS line_detector DESTINATION lib/${PROJECT_NAME})
 
-
+# ---- Tests / Linters ----
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
