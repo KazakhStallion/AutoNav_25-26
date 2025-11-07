@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-pip \
       python3-numpy \
       python3-dev \
+      python3-protobuf \
       # OpenCV (C++/Python)
       libopencv-dev \
       python3-opencv \
@@ -136,13 +137,7 @@ RUN python3 -m pip install --no-cache-dir \
       empy pybind11 \
       scipy matplotlib \
       scikit-image \
-      protobuf \
  && rosdep init || true && rosdep update || true
-
-# # Install NumPy development headers
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#       python3-numpy-dev \
-#  && rm -rf /var/lib/apt/lists/*
 
 
 # ZED SDK (Jetson)
