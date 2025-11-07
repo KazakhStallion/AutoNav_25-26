@@ -1,4 +1,3 @@
 [submodule "isaac_ros-dev/src/pointcloud_to_laserscan"]
     path = isaac_ros-dev/src/pointcloud_to_laserscan
     url = https://github.com/ros-perception/pointcloud_to_laserscan.git
-
