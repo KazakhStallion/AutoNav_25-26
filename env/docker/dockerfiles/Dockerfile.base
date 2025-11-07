@@ -139,6 +139,11 @@ RUN python3 -m pip install --no-cache-dir \
       protobuf \
  && rosdep init || true && rosdep update || true
 
+# Install NumPy development headers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3-numpy-dev \
+ && rm -rf /var/lib/apt/lists/*
+
 
 # ZED SDK (Jetson)
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
