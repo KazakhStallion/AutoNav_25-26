@@ -27,9 +27,6 @@ find_package(CUDAToolkit REQUIRED)
 # CMake will pass -gencode flags accordingly; no need to hand-write NVCC flags.
 set(CMAKE_CUDA_ARCHITECTURES 87)
 
-# (Optional) CUDA compile flags for better debugability; comment if not needed.
-# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
-
 # ---- Sources ----
 file(GLOB SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -69,7 +66,6 @@ ament_target_dependencies(line_detector
 )
 
 # ---- Link CUDA & NPP (modern imported targets) ----
-# nppist often depends on nppc; link both.
 set(_cuda_npp_targets CUDA::cudart CUDA::nppist CUDA::nppc)
 
 # Fallback if CUDAToolkit imported targets don’t define nppist on this CMake/Toolkit combo.
@@ -88,11 +84,11 @@ foreach(tgt IN LISTS _cuda_npp_targets)
 endforeach()
 
 if(_use_fallback_libs)
-  target_link_libraries(line_detector PRIVATE ${_cuda_fallback_libs})
+  target_link_libraries(line_detector ${_cuda_fallback_libs})
   # Bake rpath so the binary finds CUDA libs at runtime
   target_link_options(line_detector PRIVATE -Wl,-rpath,/usr/local/cuda/targets/aarch64-linux/lib)
 else()
-  target_link_libraries(line_detector PRIVATE ${_cuda_npp_targets})
+  target_link_libraries(line_detector ${_cuda_npp_targets})
   # Many JetPack images already have loader paths set, but bake rpath for robustness
   target_link_options(line_detector PRIVATE -Wl,-rpath,$<TARGET_FILE_DIR:CUDA::cudart>)
 endif()
