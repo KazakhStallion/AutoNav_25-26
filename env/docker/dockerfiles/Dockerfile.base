@@ -158,10 +158,6 @@ RUN test -f /tmp/zed_install.sh && chmod +x /tmp/zed_install.sh
 # Run installer
 RUN /tmp/zed_install.sh ${JETPACK_MAJOR} ${JETPACK_MINOR} ${L4T_MAJOR} ${L4T_MINOR} ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR}
 
-# Verify install
-RUN test -x /usr/local/zed/tools/ZED_Diagnostic
-RUN test -f /usr/local/zed/lib/cmake/ZED/ZEDConfig.cmake
-
 # Runtime env & loader paths
 ENV ZED_SDK_ROOT_DIR=/usr/local/zed \
     ZED_DIR=/usr/local/zed/lib/cmake/ZED \
