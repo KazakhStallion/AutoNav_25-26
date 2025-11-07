@@ -134,15 +134,15 @@ RUN python3 -m pip install --no-cache-dir -U \
 RUN python3 -m pip install --no-cache-dir \
       rosdep vcstool colcon-common-extensions \
       empy pybind11 \
-      numpy scipy matplotlib \
+      scipy matplotlib \
       scikit-image \
       protobuf \
  && rosdep init || true && rosdep update || true
 
-# Install NumPy development headers
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3-numpy-dev \
- && rm -rf /var/lib/apt/lists/*
+# # Install NumPy development headers
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#       python3-numpy-dev \
+#  && rm -rf /var/lib/apt/lists/*
 
 
 # ZED SDK (Jetson)
