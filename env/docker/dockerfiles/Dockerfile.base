@@ -136,30 +136,41 @@ RUN python3 -m pip install --no-cache-dir \
       empy pybind11 \
       numpy scipy matplotlib \
       scikit-image \
+      protobuf \
  && rosdep init || true && rosdep update || true
 
 
 # ZED SDK (Jetson)
-RUN python3 -m pip install --no-cache-dir protobuf
-
-SHELL ["/bin/bash", "-c"]
-RUN wget -q --no-check-certificate \
-    https://download.stereolabs.com/zedsdk/4.2/l4t36.4/jetsons \
-    -O /tmp/ZED_SDK_Linux_JP.run && \
-    chmod +x /tmp/ZED_SDK_Linux_JP.run && \
-    /tmp/ZED_SDK_Linux_JP.run -- silent skip_tools skip_cuda && \
-    rm -f /tmp/ZED_SDK_Linux_JP.run && \
-    ldconfig
-
-# Change ZED SDK folder group GID to 2100 cuz conflicts with Admin:1000
-RUN groupmod -g 2100 zed && \
-    chgrp -R 2100 /usr/local/zed
-
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-# Verify ZED SDK installed and group was created
-RUN which /usr/local/zed/tools/ZED_Diagnostic || echo "WARNING: ZED SDK may not be installed" && \
-    getent group zed || echo "WARNING: zed group not created"
+# Version args
+ARG JETPACK_MAJOR=6
+ARG JETPACK_MINOR=0
+ARG L4T_MAJOR=36
+ARG L4T_MINOR=4
+ARG ZED_SDK_MAJOR=5
+ARG ZED_SDK_MINOR=1
+
+# Copy the installer script from your repo into the image
+COPY src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/zed_install.sh
+RUN test -f /tmp/zed_install.sh && chmod +x /tmp/zed_install.sh
+
+# Run installer
+RUN /tmp/zed_install.sh ${JETPACK_MAJOR} ${JETPACK_MINOR} ${L4T_MAJOR} ${L4T_MINOR} ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR}
+
+# Verify install
+RUN test -x /usr/local/zed/tools/ZED_Diagnostic
+RUN test -f /usr/local/zed/lib/cmake/ZED/ZEDConfig.cmake
+
+# Runtime env & loader paths
+ENV ZED_SDK_ROOT_DIR=/usr/local/zed \
+    ZED_DIR=/usr/local/zed/lib/cmake/ZED \
+    LD_LIBRARY_PATH=/usr/local/zed/lib:${LD_LIBRARY_PATH}
+RUN echo "/usr/local/zed/lib" > /etc/ld.so.conf.d/zed.conf && ldconfig
+
+# Adjust group id only if 'zed' group exists
+RUN if getent group zed >/dev/null; then groupmod -g 2100 zed; fi && \
+    chgrp -R 2100 /usr/local/zed || true
 
 
 # Make Python packages readable by all users
