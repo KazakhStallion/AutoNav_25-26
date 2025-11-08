@@ -1,7 +1,7 @@
 # ============================================
-# Base Dockerfile: JetPack / L4T r36.4.0 (JP 6.x series)
+# Base Dockerfile: JetPack / L4T r36.4.4 (JP 6.x series)
 # ============================================
-FROM nvcr.io/nvidia/l4t-jetpack:r36.4.0
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.4
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
@@ -79,7 +79,7 @@ RUN add-apt-repository -y universe \
       ros-humble-xacro ros-humble-angles \
       # perception / PCL / image pipeline
       ros-humble-image-transport ros-humble-camera-info-manager \
-      ros-humble-cv-bridge ros-humble-image-pipeline \
+      ros-humble-image-pipeline \
       ros-humble-pcl-ros ros-humble-pcl-conversions \
       ros-humble-pointcloud-to-laserscan ros-humble-point-cloud-transport \
       # control
@@ -143,27 +143,36 @@ RUN python3 -m pip install --no-cache-dir \
 
 # ZED SDK (Jetson)
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-
 # Version args
-ARG JETPACK_MAJOR=6
-ARG JETPACK_MINOR=0
-ARG L4T_MAJOR=36
-ARG L4T_MINOR=4
 ARG ZED_SDK_MAJOR=5
 ARG ZED_SDK_MINOR=1
-
 # Copy the installer script from your repo into the image
 COPY env/docker/scripts/zed_install_fixed.sh /tmp/zed_install.sh
 RUN test -f /tmp/zed_install.sh && chmod +x /tmp/zed_install.sh
-
 # Run installer
-RUN /tmp/zed_install.sh ${JETPACK_MAJOR} ${JETPACK_MINOR} ${L4T_MAJOR} ${L4T_MINOR} ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR}
-
+RUN /tmp/zed_install.sh ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR}
 # Runtime env & loader paths
 ENV ZED_SDK_ROOT_DIR=/usr/local/zed \
     ZED_DIR=/usr/local/zed/lib/cmake/ZED \
     LD_LIBRARY_PATH=/usr/local/zed/lib:${LD_LIBRARY_PATH}
 RUN echo "/usr/local/zed/lib" > /etc/ld.so.conf.d/zed.conf && ldconfig
+
+
+# Build cv_bridge & image_geometry from source to avoid ABI mismatch
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libopencv-dev python3-opencv \
+ && rm -rf /var/lib/apt/lists/*
+
+# workspace for vision_opencv
+ENV WS=/autonav/isaac_ros-dev
+RUN mkdir -p ${WS}/src
+WORKDIR ${WS}/src
+RUN git clone -b humble https://github.com/ros-perception/vision_opencv.git
+
+WORKDIR ${WS}
+RUN . /opt/ros/humble/setup.sh && \
+    colcon build --merge-install --packages-select cv_bridge image_geometry
+
 
 # Adjust group id only if 'zed' group exists
 RUN if getent group zed >/dev/null; then groupmod -g 2100 zed; fi && \

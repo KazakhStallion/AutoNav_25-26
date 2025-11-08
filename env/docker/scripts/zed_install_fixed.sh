@@ -1,27 +1,33 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-JETPACK_MAJOR=$1
-JETPACK_MINOR=$2
-L4T_MAJOR=$3
-L4T_MINOR=$4
-ZED_SDK_MAJOR=$5
-ZED_SDK_MINOR=$6
+ZED_SDK_MAJOR=${1:-5}
+ZED_SDK_MINOR=${2:-1}
 
-ttk="===>"
+# Detect L4T from base (don’t modify it)
+if [[ -r /etc/nv_tegra_release ]]; then
+  # Example: "# R36 (release), REVISION: 4.4, ..."
+  L4T_MAJOR=$(sed -n 's/.*R\([0-9]\+\).*/\1/p' /etc/nv_tegra_release)
+  L4T_MINOR=$(sed -n 's/.*REVISION: \([0-9.]\+\).*/\1/p' /etc/nv_tegra_release)
+else
+  echo "ERROR: /etc/nv_tegra_release not found; are you on an l4t-jetpack base?" >&2
+  exit 1
+fi
 
-echo "Europe/Paris" > /etc/timezone
-echo "# R${L4T_MAJOR} (release), REVISION: ${L4T_MINOR}" > /etc/nv_tegra_release
-    
-# Install ZED SDK
-echo "${ttk} Installing ZED SDK v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR} for Jetpack ${JETPACK_MAJOR}.${JETPACK_MINOR} (L4T v${L4T_MAJOR}.${L4T_MINOR})"
+# Normalize minor to first two components (e.g., 4.4 from 4.4)
+L4T_MINOR_BARE=${L4T_MINOR%% *}
+L4T_MINOR_TRIM=${L4T_MINOR_BARE%%.*}.${L4T_MINOR_BARE#*.}
 
-# Download and install ZED SDK for Jetson
-wget -q --no-check-certificate -O /tmp/ZED_SDK_Linux_JP.run \
-    https://download.stereolabs.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}/l4t${L4T_MAJOR}.${L4T_MINOR}/jetsons && \
-chmod +x /tmp/ZED_SDK_Linux_JP.run && \
-/tmp/ZED_SDK_Linux_JP.run -- silent skip_cuda && \
-rm -rf /usr/local/zed/resources/* && \
+echo "===> Detected L4T: ${L4T_MAJOR}.${L4T_MINOR_TRIM} ; installing ZED SDK ${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}"
+
+# Build the ZED SDK URL: Stereolabs uses l4t<MAJOR>.<MINOR> directory for Jetsons
+ZED_URL="https://download.stereolabs.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}/l4t${L4T_MAJOR}.${L4T_MINOR_TRIM}/jetsons"
+
+# Download & install (Jetson uses system CUDA; keep skip_cuda)
+wget -q --no-check-certificate -O /tmp/ZED_SDK_Linux_JP.run "${ZED_URL}"
+chmod +x /tmp/ZED_SDK_Linux_JP.run
+/tmp/ZED_SDK_Linux_JP.run -- silent skip_cuda
+rm -rf /usr/local/zed/resources/* || true
 rm -f /tmp/ZED_SDK_Linux_JP.run
 
-echo "${ttk} ZED SDK installed successfully"
+echo "===> ZED SDK installed."
