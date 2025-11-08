@@ -33,9 +33,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-numpy-dev \
       python3-dev \
       python3-protobuf \
-      # OpenCV (C++/Python)
-      libopencv-dev \
-      python3-opencv \
       # multimedia / camera / codecs
       v4l-utils \
       gstreamer1.0-tools \
@@ -171,8 +168,10 @@ WORKDIR ${WS}/src
 RUN git clone -b humble https://github.com/ros-perception/vision_opencv.git
 
 WORKDIR ${WS}
-RUN . /opt/ros/humble/setup.sh && \
-    colcon build --merge-install --packages-select cv_bridge image_geometry
+RUN set +u \
+ && . /opt/ros/humble/setup.sh \
+ && colcon build --merge-install --packages-select cv_bridge image_geometry \
+ && set -u
 
 
 # Adjust group id only if 'zed' group exists
