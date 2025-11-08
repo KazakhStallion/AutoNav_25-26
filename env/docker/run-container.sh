@@ -48,7 +48,6 @@ if [[ $PLATFORM == "aarch64" ]]; then
     DOCKER_ARGS+=("-v /usr/bin/tegrastats:/usr/bin/tegrastats")
     DOCKER_ARGS+=("-v /tmp/:/tmp/")
     DOCKER_ARGS+=("--pid=host")
-    DOCKER_ARGS+=("-v /dev:/dev")
     
     # jtop support
     if [[ $(getent group jtop) ]]; then
