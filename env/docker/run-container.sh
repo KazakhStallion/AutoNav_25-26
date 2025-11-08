@@ -102,9 +102,9 @@ docker run -it --rm \
     --privileged \
     --network host \
     --ipc host \
-    -e NVIDIA_VISIBLE_DEVICES=all
-    -e NVIDIA_DRIVER_CAPABILITIES=all
-    --device /dev/bus/usb:/dev/bus/usb
+    -e NVIDIA_VISIBLE_DEVICES=all \
+    -e NVIDIA_DRIVER_CAPABILITIES=all \
+    --device /dev/bus/usb:/dev/bus/usb \
     ${DOCKER_ARGS[@]} \
     --name "$CONTAINER_NAME" \
     $IMAGE_TAG \
