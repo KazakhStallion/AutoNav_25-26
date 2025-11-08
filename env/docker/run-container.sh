@@ -47,10 +47,7 @@ if [[ $PLATFORM == "aarch64" ]]; then
     # Jetson-specific mounts and devices
     DOCKER_ARGS+=("-v /usr/bin/tegrastats:/usr/bin/tegrastats")
     DOCKER_ARGS+=("-v /tmp/:/tmp/")
-    DOCKER_ARGS+=("-v /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra")
-    DOCKER_ARGS+=("-v /usr/src/jetson_multimedia_api:/usr/src/jetson_multimedia_api")
     DOCKER_ARGS+=("--pid=host")
-    DOCKER_ARGS+=("-v /usr/share/vpi3:/usr/share/vpi3")
     DOCKER_ARGS+=("-v /dev:/dev")
     
     # jtop support
@@ -100,12 +97,15 @@ echo "Starting new container: $CONTAINER_NAME"
 echo "Mounting: ${HOST_WORKDIR} → ${CONTAINER_WORKDIR}"
 
 docker run -it --rm \
-    --runtime nvidia --gpus all \
+    --runtime nvidia \
+    --gpus all \
     --privileged \
     --network host \
     --ipc host \
+    -e NVIDIA_VISIBLE_DEVICES=all
+    -e NVIDIA_DRIVER_CAPABILITIES=all
+    --device /dev/bus/usb:/dev/bus/usb
     ${DOCKER_ARGS[@]} \
     --name "$CONTAINER_NAME" \
-    --runtime nvidia \
     $IMAGE_TAG \
     /bin/bash
