@@ -93,14 +93,18 @@ RUN add-apt-repository -y universe \
       # tooling / GUI
       ros-humble-rqt ros-humble-rqt-common-plugins \
       ros-humble-rviz2 \
+      # colcon build tool
+      python3-colcon-common-extensions \
  && rm -rf /var/lib/apt/lists/*
 
- # Rebuild cv_bridge against system OpenCV to fix ABI compatibility
+ 
+# Rebuild cv_bridge against system OpenCV to fix ABI compatibility
 RUN mkdir -p /tmp/ros_ws/src \
     && cd /tmp/ros_ws/src \
     && git clone -b humble https://github.com/ros-perception/vision_opencv.git \
     && cd /tmp/ros_ws \
-    && . /opt/ros/humble/setup.sh \
+    # disable nounset temporarily so sourcing ROS setup does not fail on unset variables
+    && set +u && . /opt/ros/humble/setup.bash && set -u \
     && colcon build --symlink-install --packages-select cv_bridge image_geometry --cmake-args -DCMAKE_BUILD_TYPE=Release \
     && cp -r /tmp/ros_ws/install/* /opt/ros/humble/ \
     && rm -rf /tmp/ros_ws
