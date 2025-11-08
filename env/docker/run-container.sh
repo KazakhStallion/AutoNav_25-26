@@ -76,6 +76,18 @@ fi
 
 DOCKER_ARGS+=("--entrypoint $ENTRYPOINT")
 
+# GPU env
+DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
+DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
+
+# Ensure container user can open /dev/nvhost* and friends
+VID_GID=$(getent group video  | cut -d: -f3)
+REN_GID=$(getent group render | cut -d: -f3)
+INPUT_GID=$(getent group input | cut -d: -f3)
+if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add $VID_GID"); fi
+if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
+if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
+
 # ===== RE-USE EXISTING CONTAINER =====
 if [ "$(docker ps -a --quiet --filter status=running --filter name=$CONTAINER_NAME)" ]; then
     echo "Container $CONTAINER_NAME is already running. Attaching..."
@@ -88,9 +100,10 @@ echo "Starting new container: $CONTAINER_NAME"
 echo "Mounting: ${HOST_WORKDIR} → ${CONTAINER_WORKDIR}"
 
 docker run -it --rm \
+    --runtime nvidia --gpus all \
     --privileged \
     --network host \
-    --ipc=host \
+    --ipc host \
     ${DOCKER_ARGS[@]} \
     --name "$CONTAINER_NAME" \
     --runtime nvidia \
