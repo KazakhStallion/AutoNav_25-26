@@ -152,7 +152,7 @@ RUN /tmp/zed_install.sh ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR} ${L4T_BASE}
 # Runtime env & loader paths
 ENV ZED_SDK_ROOT_DIR=/usr/local/zed \
     ZED_DIR=/usr/local/zed/lib/cmake/ZED \
-    LD_LIBRARY_PATH=/usr/local/zed/lib:${LD_LIBRARY_PATH}
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/zed/lib
 RUN echo "/usr/local/zed/lib" > /etc/ld.so.conf.d/zed.conf && ldconfig
 
 
