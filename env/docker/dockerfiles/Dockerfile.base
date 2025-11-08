@@ -153,7 +153,7 @@ ARG ZED_SDK_MAJOR=5
 ARG ZED_SDK_MINOR=1
 
 # Copy the installer script from your repo into the image
-COPY isaac_ros-dev/src/zed-ros2-wrapper/.ci/jetson_download_and_install_sdk.sh /tmp/zed_install.sh
+COPY env/docker/scripts/zed_install_fixed.sh /tmp/zed_install.sh
 RUN test -f /tmp/zed_install.sh && chmod +x /tmp/zed_install.sh
 
 # Run installer
