@@ -1,7 +1,7 @@
 # ============================================
-# Base Dockerfile: JetPack / L4T r36.4.4 (JP 6.x series)
+# Base Dockerfile: JetPack / L4T r36.4.0 (JP 6.x series)
 # ============================================
-FROM nvcr.io/nvidia/l4t-jetpack:r36.4.4
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
