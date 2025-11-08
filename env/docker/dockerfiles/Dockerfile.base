@@ -95,6 +95,16 @@ RUN add-apt-repository -y universe \
       ros-humble-rviz2 \
  && rm -rf /var/lib/apt/lists/*
 
+ # Rebuild cv_bridge against system OpenCV to fix ABI compatibility
+RUN mkdir -p /tmp/ros_ws/src \
+    && cd /tmp/ros_ws/src \
+    && git clone -b humble https://github.com/ros-perception/vision_opencv.git \
+    && cd /tmp/ros_ws \
+    && . /opt/ros/humble/setup.sh \
+    && colcon build --symlink-install --packages-select cv_bridge image_geometry --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    && cp -r /tmp/ros_ws/install/* /opt/ros/humble/ \
+    && rm -rf /tmp/ros_ws
+
 
 # Isaac ROS packages (if needed - remove if not using)
 RUN apt-get update && apt-get install -y --no-install-recommends \
