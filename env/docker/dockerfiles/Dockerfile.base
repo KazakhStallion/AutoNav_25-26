@@ -121,13 +121,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* || true
 
 
-# Remove desktop CUDA/NVIDIA userspace that conflicts with Jetson driver injection
-RUN apt-get purge -y 'nvidia-cuda-toolkit' 'libcuda*' 'libnvidia-*' || true \
- && rm -rf /usr/lib/aarch64-linux-gnu/nvidia \
-           /usr/lib/aarch64-linux-gnu/libcuda.so* \
- && ldconfig
-
-
 # Python packaging toolchain (compatible with PEP-660 editable installs)
 RUN python3 -m pip install --no-cache-dir -U \
       "pip==24.2" \
