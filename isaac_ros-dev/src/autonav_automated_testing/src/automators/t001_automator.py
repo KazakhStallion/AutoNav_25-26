@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-t001_automater.py - GPS Calibration Test Automater (Standardized Version)
+t001_automator.py - GPS Calibration Test Automator (Standardized Version)
 
 This script implements the GPS calibration test with the new standardized CSV format.
 
@@ -11,16 +11,16 @@ TEST Briefing (T001):
 """
 
 import rclpy
-from base_automater import BaseAutomater
+from base_automator import BaseAutomator
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
 import time
 
-class T001Automater(BaseAutomater):
+class T001Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
-        super().__init__('t001_automater', 't001', 'GPS_Calibration')
+        super().__init__('t001_automator', 't001', 'GPS_Calibration')
 
         # ===== Test-Specific Variables ===== #
         # Waypoint tracking
@@ -122,8 +122,8 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T001Automater()
-        rclpy.spin(automater)
+        automator = T001Automator()
+        rclpy.spin(automator)
     except KeyboardInterrupt:
         pass
     except Exception as e:

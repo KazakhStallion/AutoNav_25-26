@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-t010_automater.py - Test_TBD_10 Test Automater (Standardized Version)
+t003_automator.py - [Test Name TBD] Automator (Standardized Version)
 
-This script implements test t010 with the new standardized CSV format.
+This script implements test t003 with the new standardized CSV format.
 
-TEST Briefing (T010):
-Test_TBD_10 Test - [Test details to be defined]
+TEST Briefing (T003):
+[Test details to be defined]
 """
 
 import rclpy
-from base_automater import BaseAutomater
+from base_automator import BaseAutomator
 
-class T010Automater(BaseAutomater):
+class T003Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
-        super().__init__('t010_automater', 't010', 'Test_TBD_10')
+        super().__init__('t003_automator', 't003', '[Test_Name_TBD]')
 
         # ===== Test-Specific Variables ===== #
         # Add test-specific variables here
@@ -27,27 +27,28 @@ class T010Automater(BaseAutomater):
 
     def test_actions(self):
         """
-        Test-specific actions for T010 Test_TBD_10
+        Test-specific actions for T003
         [Define test actions here]
         """
-        self.get_logger().info('Starting T010 test - Test_TBD_10')
+        self.get_logger().info('Starting T003 test - [Test description TBD]')
         
         # TODO: Implement test-specific actions
         # Example:
-        # self.start_test_action()
+        # self.start_some_action()
         
         # For now, just run for a default duration
         import time
-        time.sleep(30)  # Replace with actual test logic
+        time.sleep(10)  # Replace with actual test logic
         self.stop_test()
+
 
 
 def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T010Automater()
-        rclpy.spin(automater)
+        automator = T003Automator()
+        rclpy.spin(automator)
     except KeyboardInterrupt:
         pass
     except Exception as e:

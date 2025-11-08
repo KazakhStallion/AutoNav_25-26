@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-base_automater.py - Base class for all automated test scripts
+base_automator.py - Base class for all automated test scripts
 
 This provides common functionality for:
 - Standardized CSV data format
@@ -8,7 +8,7 @@ This provides common functionality for:
 - Common ROS2 interfaces
 - Shared utility functions
 
-All test automater scripts should inherit from this base class.
+All test automator scripts should inherit from this base class.
 """
 
 import rclpy
@@ -19,7 +19,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-class BaseAutomater(Node):
+class BaseAutomator(Node):
     def __init__(self, node_name: str, test_id: str, test_name: str):
         super().__init__(node_name)
         

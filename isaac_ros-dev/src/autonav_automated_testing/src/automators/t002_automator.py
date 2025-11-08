@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-t002_automater_new.py - Line Compliance Test Automater (Standardized Version)
+t002_automator.py - Line Compliance Test Automator (Standardized Version)
 
 This script implements the line compliance test with the new standardized CSV format:
 - ROS2_Clock: ROS2 timestamp when data was received
@@ -12,14 +12,14 @@ TEST: Robot follows white lines for 110 feet while monitoring sensors
 """
 
 import rclpy
-from base_automater import BaseAutomater
+from base_automator import BaseAutomator
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
 import math
 import csv
 
-class T002Automater(BaseAutomater):
+class T002Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
         super().__init__('t002_automater', 't002', 'Line_Comp')
@@ -133,8 +133,8 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T002Automater()
-        rclpy.spin(automater)
+        automator = T002Automator()
+        rclpy.spin(automator)
     except KeyboardInterrupt:
         pass
     except Exception as e:

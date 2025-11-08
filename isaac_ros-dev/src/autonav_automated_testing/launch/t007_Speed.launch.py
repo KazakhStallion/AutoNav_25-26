@@ -13,7 +13,7 @@ Launch script for [TEST ID: t007] Speed automated test.
 Launching this script will:
 1. Start the data_publisher node to collect test data
 2. Launch specific Nodes or Launch files related to this test
-3. Execute the t007_automater.py script to manage the test
+3. Execute the t007_automator.py script to manage the test
 '''
 
 def generate_launch_description():
@@ -66,8 +66,8 @@ def generate_launch_description():
     automater_script_path = os.path.join(
         autonav_testing_share,
         'src',
-        'automaters',
-        't007_automater.py'
+        'automators',
+        't007_automator.py'
     )
     
     test_automater = ExecuteProcess(

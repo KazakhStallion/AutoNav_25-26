@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-t011_automater.py - Test_TBD_11 Test Automater (Standardized Version)
+t005_automator.py - Test_TBD_5 Test Automator (Standardized Version)
 
-This script implements test t011 with the new standardized CSV format.
+This script implements test t005 with the new standardized CSV format.
 
-TEST Briefing (T011):
-Test_TBD_11 Test - [Test details to be defined]
+TEST Briefing (T005):
+Test_TBD_5 Test - [Test details to be defined]
 """
 
 import rclpy
-from base_automater import BaseAutomater
+from base_automator import BaseAutomator
 
-class T011Automater(BaseAutomater):
+class T005Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
-        super().__init__('t011_automater', 't011', 'Test_TBD_11')
+        super().__init__('t005_automator', 't005', 'Test_TBD_5')
 
         # ===== Test-Specific Variables ===== #
         # Add test-specific variables here
@@ -27,10 +27,10 @@ class T011Automater(BaseAutomater):
 
     def test_actions(self):
         """
-        Test-specific actions for T011 Test_TBD_11
+        Test-specific actions for T005 Test_TBD_5
         [Define test actions here]
         """
-        self.get_logger().info('Starting T011 test - Test_TBD_11')
+        self.get_logger().info('Starting T005 test - Test_TBD_5')
         
         # TODO: Implement test-specific actions
         # Example:
@@ -46,8 +46,8 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        automater = T011Automater()
-        rclpy.spin(automater)
+        automator = T005Automator()
+        rclpy.spin(automator)
     except KeyboardInterrupt:
         pass
     except Exception as e:
