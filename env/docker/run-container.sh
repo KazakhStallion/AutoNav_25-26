@@ -70,7 +70,7 @@ if [[ -d "$HOME/zed/resources" ]]; then
     DOCKER_ARGS+=("-v $HOME/zed/resources:/usr/local/zed/resources")
 fi
 
-DOCKER_ARGS+=("--entrypoint $ENTRYPOINT")
+#DOCKER_ARGS+=("--entrypoint $ENTRYPOINT")
 
 # GPU env
 DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
