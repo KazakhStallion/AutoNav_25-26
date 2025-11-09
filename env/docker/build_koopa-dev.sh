@@ -1,18 +1,22 @@
 #!/bin/bash
+set -e
 
-IMAGE_NAME="dev"
-IMAGE_TAG="koopa-kingdom"
+BASE_REF="autonav:koopa-kingdom"
+IMAGE_REF="dev:koopa-kingdom"
 
-ROOT="$(dirname ${BASH_SOURCE[0]})"
-
-# Check if the image exists
-if docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" > /dev/null 2>&1; then
-    echo "Image ${IMAGE_NAME}:${IMAGE_TAG} exists. Removing it..."
-    docker rmi "${IMAGE_NAME}:${IMAGE_TAG}"
+# Ensure base exists
+if ! docker image inspect "$BASE_REF" >/dev/null 2>&1; then
+  echo "Base $BASE_REF not found. Build it first with Dockerfile.base."
+  exit 1
 fi
 
+# Rebuild only the dev layer
+if docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
+  echo "Image $IMAGE_REF exists. Removing it..."
+  docker rmi "$IMAGE_REF"
+fi
 
-docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" "$HOME/AutoNav/env/docker/dockerfiles" 
-
-
-
+# Build the dev image
+docker build -t "$IMAGE_REF" \
+  -f "$HOME/AutoNav_25-26/env/docker/dockerfiles/Dockerfile" \
+  "$HOME/AutoNav_25-26"
