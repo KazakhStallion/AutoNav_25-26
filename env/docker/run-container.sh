@@ -27,8 +27,8 @@ DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
 DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 
 # ===== D-BUS & BLUETOOTH =====
-DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
-DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
+#DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
+#DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
 
 # ===== DISPLAY FORWARDING =====
 DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
