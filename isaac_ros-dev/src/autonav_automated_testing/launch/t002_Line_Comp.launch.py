@@ -76,7 +76,7 @@ def generate_launch_description():
     # Line Detection Node - detects white lines for compliance testing
     line_detection_node = Node(
         package='line_detection',
-        executable='line_detection_node',
+        executable='line_detector',
         name='line_detection_node',
         output='screen',
         parameters=[{
