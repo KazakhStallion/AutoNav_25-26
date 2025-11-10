@@ -174,21 +174,34 @@ private:
             return;
         }
         
-        // Get current timestamp
-        auto now = this->get_clock()->now();
-        
-        // Format data as CSV: timestamp,gps_data,odom_data,cmd_vel_data,encoder_data
-        std::stringstream ss;
-        ss << now.seconds() << ","
-           << latest_gps_data_ << ","
-           << latest_odom_data_ << ","
-           << latest_cmd_vel_data_ << ","
-           << latest_encoder_data_;
+        // Publish data for each topic separately in the format expected by base_automator:
+        // "topic_name,data_type,data_values"
         
         auto msg = std_msgs::msg::String();
-        msg.data = ss.str();
         
-        data_dump_pub_->publish(msg);
+        // Publish GPS data
+        if (!latest_gps_data_.empty()) {
+            msg.data = "/gps/fix,NavSatFix," + latest_gps_data_;
+            data_dump_pub_->publish(msg);
+        }
+        
+        // Publish Odometry data
+        if (!latest_odom_data_.empty()) {
+            msg.data = "/odom,Odometry," + latest_odom_data_;
+            data_dump_pub_->publish(msg);
+        }
+        
+        // Publish cmd_vel data
+        if (!latest_cmd_vel_data_.empty()) {
+            msg.data = "/cmd_vel,Twist," + latest_cmd_vel_data_;
+            data_dump_pub_->publish(msg);
+        }
+        
+        // Publish encoder data
+        if (!latest_encoder_data_.empty()) {
+            msg.data = "/encoders,String," + latest_encoder_data_;
+            data_dump_pub_->publish(msg);
+        }
     }
 };
 

@@ -131,15 +131,34 @@ class T002Automator(BaseAutomator):
 
 def main(args=None):
     rclpy.init(args=args)
+    automator = None
     
     try:
         automator = T002Automator()
         rclpy.spin(automator)
     except KeyboardInterrupt:
-        pass
+        print('\n[INFO] Keyboard interrupt detected (Ctrl+C)')
+        if automator is not None:
+            print('[INFO] Saving collected data before shutdown...')
+            try:
+                automator.save_data()
+                print(f'[INFO] Data saved to: {automator.log_file}')
+            except Exception as e:
+                print(f'[ERROR] Failed to save data: {e}')
     except Exception as e:
-        print(f'Error: {e}')
+        print(f'[ERROR] Unexpected error: {e}')
+        if automator is not None:
+            try:
+                automator.save_data()
+                print(f'[INFO] Data saved to: {automator.log_file}')
+            except:
+                pass
     finally:
+        if automator is not None:
+            try:
+                automator.destroy_node()
+            except:
+                pass
         if rclpy.ok():
             rclpy.shutdown()
 

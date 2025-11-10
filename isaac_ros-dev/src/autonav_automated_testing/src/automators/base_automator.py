@@ -141,11 +141,16 @@ class BaseAutomator(Node):
             parsed_data = self.parse_data_dump(msg.data)
             if parsed_data:
                 self.collected_data.extend(parsed_data)
+                # Log periodically to show data is being collected
+                if len(self.collected_data) % 50 == 0:
+                    self.get_logger().info(f'Collected {len(self.collected_data)} data points so far')
+            else:
+                self.get_logger().debug(f'Failed to parse data: {msg.data[:100]}...')
 
     def parse_data_dump(self, data_string: str):
         """
         Parse the data dump string and convert to standardized format
-        Expected format: "timestamp,topic_name,data_type,data_values"
+        Expected format: "topic_name,data_type,data_values"
         Returns list of formatted rows for CSV
         """
         try:
@@ -156,6 +161,7 @@ class BaseAutomator(Node):
             # Split the incoming data
             parts = data_string.strip().split(',')
             if len(parts) < 3:
+                self.get_logger().debug(f'Insufficient data parts: {len(parts)} in "{data_string}"')
                 return None
                 
             topic_name = parts[0] if parts[0].startswith('/') else f"/{parts[0]}"
@@ -178,11 +184,10 @@ class BaseAutomator(Node):
                         data_values[0], data_values[1]
                     ])
             elif topic_name == "/odom":
-                if len(data_values) >= 6:
+                if len(data_values) >= 3:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "pos_x,pos_y,pos_z,orient_x,orient_y,orient_z",
-                        data_values[0], data_values[1], data_values[2],
-                        data_values[3], data_values[4], data_values[5]
+                        ros_timestamp, topic_name, "pos_x,pos_y,orient_z",
+                        data_values[0], data_values[1], data_values[2]
                     ])
             elif topic_name == "/cmd_vel":
                 if len(data_values) >= 2:
@@ -217,11 +222,14 @@ class BaseAutomator(Node):
                 keys = ",".join([f"value_{i}" for i in range(len(data_values))])
                 row = [ros_timestamp, topic_name, keys] + data_values
                 formatted_rows.append(row)
+            
+            if not formatted_rows:
+                self.get_logger().debug(f'No formatted rows for topic {topic_name} with {len(data_values)} values')
                 
             return formatted_rows
             
         except Exception as e:
-            self.get_logger().warn(f'Error parsing data dump: {e}')
+            self.get_logger().warn(f'Error parsing data dump: {e} | Data: "{data_string}"')
             return None
 
     def estop_callback(self, msg: String):
@@ -234,8 +242,23 @@ class BaseAutomator(Node):
         """Save collected data to CSV file in standardized format"""
         self.get_logger().info(f'Saving {len(self.collected_data)} data points')
         
-        with open(self.log_file, 'a', newline='') as f:
-            writer = csv.writer(f)
-            for data_row in self.collected_data:
-                # Data is already formatted as list from parse_data_dump
-                writer.writerow(data_row)
+        try:
+            with open(self.log_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                for data_row in self.collected_data:
+                    # Data is already formatted as list from parse_data_dump
+                    writer.writerow(data_row)
+            self.get_logger().info(f'Successfully saved data to {self.log_file}')
+        except Exception as e:
+            self.get_logger().error(f'Error saving data to CSV: {e}')
+            # Try to save to a backup file
+            try:
+                backup_file = self.log_dir / f'{self.test_id}_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+                with open(backup_file, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(['ROS2_Clock', 'Topic_Name', 'Data_Keys', 'Data_Values'])
+                    for data_row in self.collected_data:
+                        writer.writerow(data_row)
+                self.get_logger().info(f'Data saved to backup file: {backup_file}')
+            except Exception as backup_error:
+                self.get_logger().error(f'Failed to save backup: {backup_error}')
