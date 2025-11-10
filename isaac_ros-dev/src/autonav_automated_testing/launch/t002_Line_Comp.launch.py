@@ -87,7 +87,7 @@ def generate_launch_description():
     # Odometry Handler Node - publishes wheel encoder data to /encoders and /odom
     odom_handler_node = Node(
         package='odom_handler',
-        executable='odom_publisher',
+        executable='wheel_odometry_publisher',
         name='odom_publisher_node',
         output='screen',
         parameters=[{
