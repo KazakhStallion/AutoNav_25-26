@@ -9,3 +9,4 @@
 [submodule "isaac_ros-dev/src/sick_scan_xd"]
 	path = isaac_ros-dev/src/sick_scan_xd
 	url = https://github.com/SICKAG/sick_scan_xd.git
+	branch = master
