@@ -1,0 +1,191 @@
+# ============================================
+# Base Dockerfile: JetPack / L4T r36.4.0 (JP 6.x series)
+# ============================================
+FROM nvcr.io/nvidia/l4t-jetpack:r36.4.0
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# Core dev tools, codecs, GStreamer, V4L2, OpenCV, Python
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      # base
+      ca-certificates \
+      gnupg \
+      lsb-release \
+      software-properties-common \
+      build-essential \
+      cmake \
+      git \
+      curl \
+      wget \
+      sudo \
+      nano \
+      zstd \
+      bash-completion \
+      pkg-config \
+      # Python
+      python3-pip \
+      python3-numpy \
+      python3-numpy-dev \
+      python3-dev \
+      python3-protobuf \
+      # multimedia / camera / codecs
+      v4l-utils \
+      gstreamer1.0-tools \
+      gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+      gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+      gstreamer1.0-libav \
+      libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+      # low-level I/O for sensors
+      libasio-dev libpcap0.8-dev libusb-1.0-0-dev \
+      # C++ libs commonly needed by robotics stacks
+      libeigen3-dev \
+      libboost-all-dev \
+      libyaml-cpp-dev \
+      libfmt-dev \
+      libspdlog-dev \
+      libprotobuf-dev \
+      protobuf-compiler \
+      libtinyxml2-dev \
+      libtbb-dev \
+      libgoogle-glog-dev \
+      libgflags-dev \
+      libceres-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# ROS 2 Humble (Jammy) – perception, Nav2, PCL, etc.
+RUN add-apt-repository -y universe \
+ && curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+      -o /usr/share/keyrings/ros-archive-keyring.gpg \
+ && echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+      http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
+      > /etc/apt/sources.list.d/ros2.list \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      # base/runtime
+      ros-humble-ros-base \
+      ros-humble-rclcpp ros-humble-rclcpp-components \
+      ros-humble-tf2-ros ros-humble-tf2-geometry-msgs \
+      ros-humble-geometry-msgs ros-humble-nav-msgs ros-humble-sensor-msgs \
+      ros-humble-diagnostics ros-humble-diagnostic-updater \
+      ros-humble-robot-state-publisher ros-humble-joint-state-publisher \
+      ros-humble-xacro ros-humble-angles \
+      # perception / PCL / image pipeline
+      ros-humble-image-transport ros-humble-camera-info-manager \
+      ros-humble-image-pipeline \
+      ros-humble-pcl-ros ros-humble-pcl-conversions \
+      ros-humble-pointcloud-to-laserscan ros-humble-point-cloud-transport \
+      # control
+      ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-joy \
+      # navigation
+      ros-humble-navigation2 ros-humble-nav2-bringup \
+      # SLAM
+      ros-humble-slam-toolbox \
+      # GPS/GNSS messages
+      ros-humble-geographic-msgs ros-humble-nmea-msgs \
+      # tooling / GUI
+      ros-humble-rqt ros-humble-rqt-common-plugins \
+      ros-humble-rviz2 \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# Isaac ROS packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-humble-isaac-ros-common \
+      ros-humble-isaac-ros-visual-slam \
+      ros-humble-isaac-ros-image-pipeline \
+      ros-humble-isaac-ros-apriltag \
+      ros-humble-isaac-ros-dnn-inference \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
+# Jetson vision (VPI)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      nvidia-vpi vpi3-dev vpi3-samples \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
+# GPS/GNSS support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      gpsd libgps-dev python3-gps \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# SLAM additional dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libg2o-dev \
+ && rm -rf /var/lib/apt/lists/* || true
+
+
+# Python packaging toolchain (compatible with PEP-660 editable installs)
+RUN python3 -m pip install --no-cache-dir -U \
+      "pip==24.2" \
+      "setuptools==70.0.0" \
+      "wheel==0.44.0" \
+      "packaging==24.2" \
+      "certifi"
+
+# ROS dev tooling via pip (arm64-friendly) + Py scientific stack
+RUN python3 -m pip install --no-cache-dir \
+      rosdep vcstool colcon-common-extensions \
+      empy pybind11 \
+      scipy matplotlib \
+      scikit-image \
+ && rosdep init || true && rosdep update || true
+
+
+# ZED SDK (Jetson)
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+# Version args
+ARG ZED_SDK_MAJOR=5
+ARG ZED_SDK_MINOR=1
+ARG L4T_BASE=36.4
+# Copy the installer script from your repo into the image
+COPY env/docker/scripts/zed_install_fixed.sh /tmp/zed_install.sh
+RUN test -f /tmp/zed_install.sh && chmod +x /tmp/zed_install.sh
+# Run installer
+RUN /tmp/zed_install.sh ${ZED_SDK_MAJOR} ${ZED_SDK_MINOR} ${L4T_BASE}
+# Runtime env & loader paths
+ENV ZED_SDK_ROOT_DIR=/usr/local/zed \
+    ZED_DIR=/usr/local/zed/lib/cmake/ZED \
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/zed/lib
+RUN echo "/usr/local/zed/lib" > /etc/ld.so.conf.d/zed.conf && ldconfig
+
+
+# Build cv_bridge & image_geometry from source to avoid ABI mismatch
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libopencv-dev python3-opencv \
+ && rm -rf /var/lib/apt/lists/*
+
+# workspace for vision_opencv
+ENV WS=/autonav/isaac_ros-dev
+RUN mkdir -p ${WS}/src
+WORKDIR ${WS}/src
+RUN git clone -b humble https://github.com/ros-perception/vision_opencv.git
+
+WORKDIR ${WS}
+RUN set +u \
+ && . /opt/ros/humble/setup.sh \
+ && colcon build --merge-install --packages-select cv_bridge image_geometry \
+ && set -u
+
+
+# Adjust group id only if 'zed' group exists
+RUN if getent group zed >/dev/null; then groupmod -g 2100 zed; fi && \
+    chgrp -R 2100 /usr/local/zed || true
+
+
+# Make Python packages readable by all users
+RUN chmod -R a+rX /usr/local/lib/python3.10/dist-packages/
+
+
+# ROS autosource for interactive shells
+RUN printf '%s\n' \
+  '[ -f /opt/ros/humble/setup.bash ] && source /opt/ros/humble/setup.bash' \
+  > /etc/profile.d/ros_humble.sh
+
+CMD ["/bin/bash"]

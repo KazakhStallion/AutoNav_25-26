@@ -13,7 +13,7 @@ Launch script for [TEST ID: t006] Simulation automated test.
 Launching this script will:
 1. Start the data_publisher node to collect test data
 2. Launch specific Nodes or Launch files related to this test
-3. Execute the t006_automater.py script to manage the test
+3. Execute the t006_automator.py script to manage the test
 '''
 
 def generate_launch_description():
@@ -64,12 +64,10 @@ def generate_launch_description():
     # Execute the test automater script
     # This script handles test orchestration, data collection, and log file generation
     automater_script_path = os.path.join(
-        os.path.dirname(autonav_testing_share),
-        '..',
-        '..',
-        'scripts',
-        'automatic_testing',
-        't006_automater.py'
+        autonav_testing_share,
+        'src',
+        'automators',
+        't006_automator.py'
     )
     
     test_automater = ExecuteProcess(

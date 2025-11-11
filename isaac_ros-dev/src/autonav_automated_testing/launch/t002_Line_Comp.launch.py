@@ -13,7 +13,7 @@ Launch script for [TEST ID: t002] Line Compliance automated test.
 Launching this script will:
 1. Start the data_publisher node to collect test data
 2. Launch specific Nodes or Launch files related to this test
-3. Execute the t002_automater.py script to manage the test
+3. Execute the t002_automator.py script to manage the test
 '''
 
 def generate_launch_description():
@@ -28,6 +28,8 @@ def generate_launch_description():
     # Get package directories
     autonav_testing_share = get_package_share_directory('autonav_automated_testing')
     # ===== Test Specific Packages ===== #
+    bringup_share = FindPackageShare('bringup')
+    control_share = FindPackageShare('control')
     # ================================== #
 
     # Path to test data configuration file
@@ -56,20 +58,72 @@ def generate_launch_description():
         }]
     )
 
-    # ===== Lines below here are specific to the t001 test ===== #
+    # ===== Lines below here are specific to the t002 test ===== #
 
     # [NODES] #
+    # GPS Handler Node - publishes GPS fix data to /gps/fix
+    gps_handler_node = Node(
+        package='gps_handler',
+        executable='gps_publisher',
+        name='gps_publisher_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'gps_port': '/dev/ttyUSB0'  # Adjust based on your GPS device
+        }]
+    )
+
+    # Line Detection Node - detects white lines for compliance testing
+    line_detection_node = Node(
+        package='line_detection',
+        executable='line_detector',
+        name='line_detection_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }]
+    )
+
+    # Odometry Handler Node - publishes wheel encoder data to /encoders and /odom
+    odom_handler_node = Node(
+        package='odom_handler',
+        executable='wheel_odometry_publisher',
+        name='odom_publisher_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }]
+    )
+
     # [LAUNCH FILES] #
+    # Include standard bringup launch file (includes camera, sensors, SLAM)
+    # This provides: ZED camera, SICK LiDAR (/scan), TF transforms, SLAM
+    standard_bringup = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([bringup_share, 'launch', 'bringup.launch.py'])
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }.items()
+    )
+
+    # Include control launch file for motor control and /cmd_vel processing
+    control_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([control_share, 'launch', 'control_dev.launch.py'])
+        ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time')
+        }.items()
+    )
 
     # Execute the test automater script
     # This script handles test orchestration, data collection, and log file generation
     automater_script_path = os.path.join(
-        os.path.dirname(autonav_testing_share),
-        '..',
-        '..',
-        'scripts',
-        'automatic_testing',
-        't002_automater.py'
+        autonav_testing_share,
+        'src',
+        'automators',
+        't002_automator.py'
     )
     
     test_automater = ExecuteProcess(
@@ -85,7 +139,13 @@ def generate_launch_description():
         
         # ===== Specific to test ===== #
         # [NODES] #
+        gps_handler_node,
+        odom_handler_node,
+        line_detection_node,
+        
         # [LAUNCH FILES] #
+        standard_bringup,
+        control_launch,
         # ============================ #
         
         # Data collection node

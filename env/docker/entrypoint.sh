@@ -64,4 +64,7 @@ done
 # Restart udev daemon
 service udev restart
 
+# Change to workdir
+cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
+
 exec gosu ${USERNAME} "$@"

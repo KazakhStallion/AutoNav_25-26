@@ -1,4 +1,12 @@
 [submodule "isaac_ros-dev/src/pointcloud_to_laserscan"]
     path = isaac_ros-dev/src/pointcloud_to_laserscan
     url = https://github.com/ros-perception/pointcloud_to_laserscan.git
-
+	branch = humble
+[submodule "isaac_ros-dev/src/zed-ros2-wrapper"]
+	path = isaac_ros-dev/src/zed-ros2-wrapper
+	url = https://github.com/stereolabs/zed-ros2-wrapper.git
+	branch = master
+[submodule "isaac_ros-dev/src/sick_scan_xd"]
+	path = isaac_ros-dev/src/sick_scan_xd
+	url = https://github.com/SICKAG/sick_scan_xd.git
+	branch = master

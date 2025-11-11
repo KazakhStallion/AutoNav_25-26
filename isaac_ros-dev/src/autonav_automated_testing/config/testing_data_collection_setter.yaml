@@ -62,8 +62,8 @@ data_publisher:
     # Test 001: GPS Calibration - Validates GPS accuracy and waypoint navigation
     t001: ["/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"]
     
-    # Test 002: Line Compliance
-    t002: []
+    # Test 002: Line Compliance - Monitor GPS, IMU, LiDAR, and Encoders for line following
+    t002: ["/gps/fix", "/imu/data", "/scan", "/encoders", "/odom", "/cmd_vel", "/line_detection/lines"]
     
     # Test 003: Forward Movement
     t003: ["/odom", "/encoders", "/cmd_vel", "/camera/image_raw"]

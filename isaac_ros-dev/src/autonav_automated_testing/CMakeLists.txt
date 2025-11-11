@@ -8,34 +8,42 @@ endif()
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rqt_gui_cpp REQUIRED)
+find_package(pluginlib REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # RQT Plugin Library
-add_library(${PROJECT_NAME}_plugin SHARED
+add_library(autonav_automated_testing_plugin SHARED
   src/autonav_automated_testing_plugin.cpp
+  include/autonav_automated_testing/autonav_automated_testing_plugin.hpp
 )
 
-target_include_directories(${PROJECT_NAME}_plugin PUBLIC
-  include
+target_include_directories(autonav_automated_testing_plugin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(${PROJECT_NAME}_plugin
+target_link_libraries(autonav_automated_testing_plugin
   Qt5::Widgets
-  rqt_gui_cpp::rqt_gui_cpp
 )
 
-ament_target_dependencies(${PROJECT_NAME}_plugin
+ament_target_dependencies(autonav_automated_testing_plugin
+  rclcpp
+  std_msgs
   rqt_gui_cpp
-  Qt5
+  pluginlib
+  ament_index_cpp
 )
 
 # Data Publisher Executable
@@ -53,11 +61,13 @@ ament_target_dependencies(data_publisher
 )
 
 # Export the plugin.xml
-pluginlib_export_plugin_description_file(rqt_gui "plugin.xml")
+pluginlib_export_plugin_description_file(rqt_gui plugin.xml)
 
 # Install targets
-install(TARGETS ${PROJECT_NAME}_plugin
+install(TARGETS autonav_automated_testing_plugin
+  ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(TARGETS data_publisher
@@ -68,7 +78,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION include/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch config
+install(DIRECTORY launch config images src
   DESTINATION share/${PROJECT_NAME}
 )
 
