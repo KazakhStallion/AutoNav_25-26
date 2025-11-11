@@ -44,7 +44,7 @@ def generate_launch_description():
     return LaunchDescription([
         bowser,
         sensors,
-        slam
+        # slam
     ])
 
 
