@@ -66,28 +66,28 @@ data_publisher:
     t002: []
     
     # Test 003: Forward Movement
-    t003: []
+    t003: ["/odom", "/encoders", "/cmd_vel", "/camera/image_raw"]
     
     # Test 004: Object Detection
-    t004: []
+    t004: ["/camera/image_raw", "/depth_camera/points", "/scan", "/odom", "/cmd_vel"]
     
     # Test 005: Path Planning
-    t005: []
+    t005: ["/global_costmap/costmap", "/local_costmap/costmap", "/plan", "/odom", "/cmd_vel"]
     
     # Test 006: Simulation
-    t006: []
+    t006: ["/odom", "/scan", "/tf", "/global_costmap/costmap", "/local_costmap/costmap"]
     
     # Test 007: Speed
-    t007: []
+    t007: ["/encoders", "/odom", "/cmd_vel"]
     
     # Test 008: Acceleration
-    t008: []
+    t008: ["/encoders", "/odom", "/cmd_vel"]
     
     # Test 009: Rotation
-    t009: []
+    t009: ["/imu/data", "/odom", "/cmd_vel"]
     
     # Test 010: Steering Drift
-    t010: []
+    t010: ["/odom", "/encoders", "/imu/data", "/cmd_vel"]
     
     # Test 011: Incline Performance
-    t011: []
+    t011: ["/imu/data", "/odom", "/encoders", "/cmd_vel"]
