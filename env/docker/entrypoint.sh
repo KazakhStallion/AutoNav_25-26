@@ -67,4 +67,25 @@ service udev restart
 # Change to workdir
 cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
 
+# Auto-install ROS dependencies and build if not already built
+if [ -d "src" ] && [ ! -d "install" ]; then
+    echo "First run detected. Setting up ROS workspace"
+
+    # Update rosdep and install dependencies
+    echo "Updating package lists and installing dependencies..."
+    apt-get update -qq
+    rosdep install --from-paths src --ignore-src -r -y
+    
+    # Build workspace
+    echo "Building ROS workspace..."
+    gosu ${USERNAME} bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
+    
+    # Add workspace sourcing to user's bashrc
+    if ! grep -q "source.*install/setup.bash" /home/${USERNAME}/.bashrc; then
+        echo "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" >> /home/${USERNAME}/.bashrc
+    fi
+    
+    echo "ROS workspace setup complete!"
+fi
+
 exec gosu ${USERNAME} "$@"
