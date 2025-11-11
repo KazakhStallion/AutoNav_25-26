@@ -2,8 +2,11 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <autonav_interfaces/msg/encoders.hpp>
 
 #include <string>
 #include <vector>
@@ -46,6 +49,9 @@ private:
     std::string latest_odom_data_;
     std::string latest_cmd_vel_data_;
     std::string latest_encoder_data_;
+    std::string latest_imu_data_;
+    std::string latest_scan_data_;
+    std::string latest_lines_data_;
     
     // Generic subscribers - will be created dynamically based on topics_to_monitor
     std::vector<rclcpp::SubscriptionBase::SharedPtr> dynamic_subscribers_;
@@ -104,6 +110,36 @@ private:
                 });
             dynamic_subscribers_.push_back(sub);
         }
+        else if (topic == "/imu/data") {
+            auto sub = this->create_subscription<sensor_msgs::msg::Imu>(
+                topic, rclcpp::SensorDataQoS(),
+                [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(6)
+                       << msg->linear_acceleration.x << ","
+                       << msg->linear_acceleration.y << ","
+                       << msg->linear_acceleration.z << ","
+                       << msg->angular_velocity.x << ","
+                       << msg->angular_velocity.y << ","
+                       << msg->angular_velocity.z << ","
+                       << msg->orientation.x << ","
+                       << msg->orientation.y << ","
+                       << msg->orientation.z;
+                    latest_imu_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/scan") {
+            auto sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
+                topic, rclcpp::SensorDataQoS(),
+                [this](const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(3)
+                       << msg->range_min << "," << msg->range_max << "," << msg->ranges.size();
+                    latest_scan_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
         else if (topic == "/odom") {
             auto sub = this->create_subscription<nav_msgs::msg::Odometry>(
                 topic, 10,
@@ -129,10 +165,21 @@ private:
             dynamic_subscribers_.push_back(sub);
         }
         else if (topic == "/encoders") {
+            auto sub = this->create_subscription<autonav_interfaces::msg::Encoders>(
+                topic, 10,
+                [this](const autonav_interfaces::msg::Encoders::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << msg->left_motor_count << "," << msg->right_motor_count;
+                    latest_encoder_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/line_detection/lines") {
+            // Fallback: if line detection publishes String payloads
             auto sub = this->create_subscription<std_msgs::msg::String>(
                 topic, 10,
                 [this](const std_msgs::msg::String::SharedPtr msg) {
-                    latest_encoder_data_ = msg->data;
+                    latest_lines_data_ = msg->data;
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -148,6 +195,9 @@ private:
             latest_odom_data_.clear();
             latest_cmd_vel_data_.clear();
             latest_encoder_data_.clear();
+            latest_imu_data_.clear();
+            latest_scan_data_.clear();
+            latest_lines_data_.clear();
         } else {
             RCLCPP_INFO(this->get_logger(), "Data collection DISABLED");
         }
@@ -188,6 +238,22 @@ private:
                 RCLCPP_INFO(this->get_logger(), "Publishing GPS: %s", msg.data.c_str());
             }
         }
+        // Publish IMU data
+        if (!latest_imu_data_.empty()) {
+            msg.data = "/imu/data,Imu," + latest_imu_data_;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing IMU: %s", msg.data.c_str());
+            }
+        }
+        // Publish LaserScan data summary
+        if (!latest_scan_data_.empty()) {
+            msg.data = "/scan,LaserScan," + latest_scan_data_;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing Scan: %s", msg.data.c_str());
+            }
+        }
         
         // Publish Odometry data
         if (!latest_odom_data_.empty()) {
@@ -213,6 +279,14 @@ private:
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing encoders: %s", msg.data.c_str());
+            }
+        }
+        // Publish line detection data if available
+        if (!latest_lines_data_.empty()) {
+            msg.data = "/line_detection/lines,String," + latest_lines_data_;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing lines: %s", msg.data.c_str());
             }
         }
         
