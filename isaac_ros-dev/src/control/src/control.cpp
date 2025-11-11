@@ -31,8 +31,8 @@ class ControlNode : public rclcpp::Node {
         this->declare_parameter("path_planning_topic", "cmd_vel");
 
         // serial ports
-        this->declare_parameter("motor_port", "/dev/serial/by-id/usb-RoboteQ_RoboteQ_FBLG2360T_HABJAA5QR0E5NDEg_207A34554147-if00");
-        this->declare_parameter("arduino_port", "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_8583030363935190F141-if00");
+        this->declare_parameter("motor_port", "/dev/ttyACM0");
+        this->declare_parameter("arduino_port", "/dev/ttyACM2");
         this->declare_parameter("estop_port", "/dev/ttyTHS1");
 
         configure_server = this->create_service<autonav_interfaces::srv::ConfigureControl>
