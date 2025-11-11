@@ -16,6 +16,7 @@ from base_automator import BaseAutomator
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import Joy
 import math
 import csv
 
@@ -39,6 +40,8 @@ class T002Automator(BaseAutomator):
         
         # ===== Test Specific Publishers ===== #
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        # Publish a one-time Joy toggle to enable autonomous mode in control node
+        self.joy_pub = self.create_publisher(Joy, 'joy', 10)
         # ==================================== #
 
         # ===== Test Specific Subscribers ===== #
@@ -72,14 +75,38 @@ class T002Automator(BaseAutomator):
         self.get_logger().info('Starting line compliance test - robot will follow white lines')
         self.line_following_active = True
         
-        # Send initial forward command to start moving
-        # The line detection and control should take over from the bringup launch
-        initial_cmd = Twist()
-        initial_cmd.linear.x = 0.5  # Start with slow forward motion
-        initial_cmd.angular.z = 0.0
-        self.cmd_vel_pub.publish(initial_cmd)
+        # Do NOT command motion here; the bringup/nav stack should own motion.
+        # Enable autonomous mode on the control node via Joy X button rising edge.
+        self._toggle_autonomous_mode()
         
         self.get_logger().info('Line following activated - bringup.launch.py should handle line detection and control')
+
+    def _toggle_autonomous_mode(self):
+        """Toggle control node into autonomous mode by simulating X button press on /joy."""
+        try:
+            # Press
+            press = Joy()
+            press.buttons = [0]*8
+            press.axes = [0.0]*4
+            press.buttons[3] = 1  # X
+            self.joy_pub.publish(press)
+            self.get_logger().info('Sent Joy X press to enable autonomous mode')
+
+            # Release shortly after to create a rising edge
+            def release_once():
+                rel = Joy()
+                rel.buttons = [0]*8
+                rel.axes = [0.0]*4
+                self.joy_pub.publish(rel)
+                self.get_logger().info('Sent Joy X release')
+                try:
+                    release_timer.cancel()
+                except Exception:
+                    pass
+
+            release_timer = self.create_timer(0.2, release_once)
+        except Exception as e:
+            self.get_logger().warn(f'Failed to toggle autonomous mode: {e}')
 
     def gps_callback(self, msg: NavSatFix):
         """Track GPS position for distance calculation"""
