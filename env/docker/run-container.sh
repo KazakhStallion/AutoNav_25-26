@@ -84,6 +84,12 @@ if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add $VID_GID"); fi
 if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
 if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
 
+# External USB devices (e.g., LiDAR, serial devices)
+DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
+DOCKER_ARGS+=("--device=/dev/ttyTHS1") # E-stop serial port
+DOCKER_ARGS+=("--device-cgroup-rule=c 166:* rmw") # all ACM serial devices
+DOCKER_ARGS+=("--device-cgroup-rule=c 188:* rmw") # all USB serial devices
+
 # ===== RE-USE EXISTING CONTAINER =====
 if [ "$(docker ps -a --quiet --filter status=running --filter name=$CONTAINER_NAME)" ]; then
     echo "Container $CONTAINER_NAME is already running. Attaching..."
