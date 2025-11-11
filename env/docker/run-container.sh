@@ -62,6 +62,12 @@ DOCKER_ARGS+=("--workdir ${CONTAINER_WORKDIR}/isaac_ros-dev")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
 
+# ===== PERSISTENT BUILD VOLUMES =====
+# These volumes persist the build artifacts across container runs
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/build")
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
+
 # ZED settings/resources
 if [[ -d "$HOME/zed/settings" ]]; then
     DOCKER_ARGS+=("-v $HOME/zed/settings:/usr/local/zed/settings")
@@ -85,8 +91,16 @@ if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
 if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
 
 # ===== RE-USE EXISTING CONTAINER =====
-if [ "$(docker ps -a --quiet --filter status=running --filter name=$CONTAINER_NAME)" ]; then
+if [ "$(docker ps -a --quiet --filter status=running --filter name=^/${CONTAINER_NAME}$)" ]; then
     echo "Container $CONTAINER_NAME is already running. Attaching..."
+    docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
+    exit 0
+fi
+
+# Check if container exists but is stopped
+if [ "$(docker ps -a --quiet --filter status=exited --filter name=^/${CONTAINER_NAME}$)" ]; then
+    echo "Container $CONTAINER_NAME exists but is stopped. Starting and attaching..."
+    docker start $CONTAINER_NAME
     docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
     exit 0
 fi
@@ -95,7 +109,7 @@ fi
 echo "Starting new container: $CONTAINER_NAME"
 echo "Mounting: ${HOST_WORKDIR} → ${CONTAINER_WORKDIR}"
 
-docker run -it --rm \
+docker run -it \
     --runtime nvidia \
     --gpus all \
     --privileged \
