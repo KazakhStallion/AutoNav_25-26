@@ -66,8 +66,8 @@ class BaseAutomator(Node):
         """Create log file with standardized CSV header only"""
         with open(self.log_file, 'w', newline='') as f:
             writer = csv.writer(f)
-            # Standardized CSV Header for all tests (no metadata)
-            writer.writerow(['ROS2_Clock', 'Topic_Name', 'Data_Keys', 'Data_Values'])
+            # Standardized CSV Header - Data values will expand into additional columns
+            writer.writerow(['ROS2_Clock', 'Topic_Name', 'Data_Keys', 'Value_0', 'Value_1', 'Value_2', 'Value_3', 'Value_4', 'Value_5', 'Value_6', 'Value_7', 'Value_8'])
 
     def test_manager(self):
         """Base test manager - override in child classes for specific behavior"""
@@ -137,6 +137,10 @@ class BaseAutomator(Node):
     def data_callback(self, msg: String):
         """Collect and parse data from /data/dump topic"""
         if self.test_started and not self.test_complete:
+            # Debug: Log first few messages to see the format
+            if len(self.collected_data) < 5:
+                self.get_logger().info(f'Raw data received: "{msg.data}"')
+            
             # Parse the incoming data string
             parsed_data = self.parse_data_dump(msg.data)
             if parsed_data:
@@ -145,7 +149,8 @@ class BaseAutomator(Node):
                 if len(self.collected_data) % 50 == 0:
                     self.get_logger().info(f'Collected {len(self.collected_data)} data points so far')
             else:
-                self.get_logger().debug(f'Failed to parse data: {msg.data[:100]}...')
+                if len(self.collected_data) < 10:
+                    self.get_logger().warn(f'Failed to parse data: "{msg.data}"')
 
     def parse_data_dump(self, data_string: str):
         """
@@ -174,49 +179,54 @@ class BaseAutomator(Node):
             if topic_name == "/gps/fix":
                 if len(data_values) >= 3:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "latitude,longitude,altitude",
-                        data_values[0], data_values[1], data_values[2]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "latitude,longitude,altitude"
+                    ] + data_values[0:3])
             elif topic_name == "/encoders":
                 if len(data_values) >= 2:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "encoder_left,encoder_right",
-                        data_values[0], data_values[1]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "encoder_left,encoder_right"
+                    ] + data_values[0:2])
             elif topic_name == "/odom":
                 if len(data_values) >= 3:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "pos_x,pos_y,orient_z",
-                        data_values[0], data_values[1], data_values[2]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "pos_x,pos_y,orient_z"
+                    ] + data_values[0:3])
             elif topic_name == "/cmd_vel":
                 if len(data_values) >= 2:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "linear_x,angular_z",
-                        data_values[0], data_values[1]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "linear_x,angular_z"
+                    ] + data_values[0:2])
             elif topic_name == "/imu/data":
                 if len(data_values) >= 9:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,orient_x,orient_y,orient_z",
-                        data_values[0], data_values[1], data_values[2],
-                        data_values[3], data_values[4], data_values[5],
-                        data_values[6], data_values[7], data_values[8]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,orient_x,orient_y,orient_z"
+                    ] + data_values[0:9])
             elif topic_name == "/scan":
                 # LiDAR data - summarize range data
                 if len(data_values) >= 3:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "range_min,range_max,ranges_count",
-                        data_values[0], data_values[1], data_values[2]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "range_min,range_max,ranges_count"
+                    ] + data_values[0:3])
             elif topic_name == "/line_detection/lines":
                 # Line detection data
                 if len(data_values) >= 1:
                     formatted_rows.append([
-                        ros_timestamp, topic_name, "lines_detected",
-                        data_values[0]
-                    ])
+                        ros_timestamp, 
+                        topic_name, 
+                        "lines_detected"
+                    ] + data_values[0:1])
             else:
                 # Generic format for unknown topics
                 keys = ",".join([f"value_{i}" for i in range(len(data_values))])

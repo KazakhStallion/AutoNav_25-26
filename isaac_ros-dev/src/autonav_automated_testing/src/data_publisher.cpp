@@ -178,30 +178,45 @@ private:
         // "topic_name,data_type,data_values"
         
         auto msg = std_msgs::msg::String();
+        static int debug_count = 0;
         
         // Publish GPS data
         if (!latest_gps_data_.empty()) {
             msg.data = "/gps/fix,NavSatFix," + latest_gps_data_;
             data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing GPS: %s", msg.data.c_str());
+            }
         }
         
         // Publish Odometry data
         if (!latest_odom_data_.empty()) {
             msg.data = "/odom,Odometry," + latest_odom_data_;
             data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing Odom: %s", msg.data.c_str());
+            }
         }
         
         // Publish cmd_vel data
         if (!latest_cmd_vel_data_.empty()) {
             msg.data = "/cmd_vel,Twist," + latest_cmd_vel_data_;
             data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing cmd_vel: %s", msg.data.c_str());
+            }
         }
         
         // Publish encoder data
         if (!latest_encoder_data_.empty()) {
             msg.data = "/encoders,String," + latest_encoder_data_;
             data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing encoders: %s", msg.data.c_str());
+            }
         }
+        
+        debug_count++;
     }
 };
 
