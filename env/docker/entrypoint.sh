@@ -41,7 +41,6 @@ adduser ${USERNAME} zed >/dev/null
 
 source /opt/ros/humble/setup.bash # source ros setup
 
-
 # If jtop present, give the user access
 if [ -S /run/jtop.sock ]; then
   JETSON_STATS_GID="$(stat -c %g /run/jtop.sock)"
@@ -67,54 +66,18 @@ service udev restart
 # Change to workdir
 cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
 
-echo "=========================================="
-echo "DEBUG: Current directory: $(pwd)"
-echo "DEBUG: Checking for src directory..."
-if [ -d "src" ]; then
-    echo "DEBUG: src directory EXISTS"
-    ls -la src/ | head -5
-else
-    echo "DEBUG: src directory NOT FOUND"
-fi
-echo "DEBUG: Checking for install/setup.bash..."
-if [ -f "install/setup.bash" ]; then
-    echo "DEBUG: install/setup.bash EXISTS (will NOT build)"
-else
-    echo "DEBUG: install/setup.bash NOT FOUND (will build)"
-fi
-echo "=========================================="
-
-# Fix permissions
+# Fix permissions on build directories if they exist
 for dir in build install log; do
     if [ -d "$dir" ]; then
         chown -R ${HOST_USER_UID}:${HOST_USER_GID} "$dir"
     fi
 done
 
-# Auto-install ROS dependencies and build
-CONTAINER_BUILD_MARKER="/tmp/.ros_workspace_built_in_container"
-
-if [ -d "src" ] && [ ! -f "$CONTAINER_BUILD_MARKER" ]; then
-    echo "First run detected. Setting up ROS workspace..."
-    
-    # Update rosdep and install dependencies
-    echo "Updating package lists and installing dependencies..."
-    apt-get update -qq
-    rosdep install --from-paths src --ignore-src -r -y -qq
-    
-    # Build workspace as the user (not root)
-    echo "Building ROS workspace..."
-    gosu ${USERNAME} bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
-    
-    # Create marker file to indicate build completed
-    touch "$CONTAINER_BUILD_MARKER"
-    
-    # Add workspace sourcing to user's bashrc
+# Source workspace
+if [ -f "${WORKDIR}/isaac_ros-dev/install/setup.bash" ]; then
     if ! grep -q "source.*install/setup.bash" /home/${USERNAME}/.bashrc; then
         echo "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" >> /home/${USERNAME}/.bashrc
     fi
-    
-    echo "ROS workspace setup complete!"
 fi
 
 exec gosu ${USERNAME} "$@"
