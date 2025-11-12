@@ -59,7 +59,7 @@ def generate_launch_description():
         hostname,
         udp_receiver_ip,
         zed,
-        # sick
+        sick
     ])
 
     
