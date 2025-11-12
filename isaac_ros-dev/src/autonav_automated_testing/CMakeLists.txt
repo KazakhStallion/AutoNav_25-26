@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(autonav_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -51,10 +52,12 @@ add_executable(data_publisher src/data_publisher.cpp)
 target_include_directories(data_publisher PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+  ${autonav_interfaces_INCLUDE_DIRS}
 )
 ament_target_dependencies(data_publisher
   rclcpp
   std_msgs
+  autonav_interfaces
   sensor_msgs
   nav_msgs
   geometry_msgs
