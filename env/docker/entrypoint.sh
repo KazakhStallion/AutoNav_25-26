@@ -67,6 +67,23 @@ service udev restart
 # Change to workdir
 cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
 
+echo "=========================================="
+echo "DEBUG: Current directory: $(pwd)"
+echo "DEBUG: Checking for src directory..."
+if [ -d "src" ]; then
+    echo "DEBUG: src directory EXISTS"
+    ls -la src/ | head -5
+else
+    echo "DEBUG: src directory NOT FOUND"
+fi
+echo "DEBUG: Checking for install/setup.bash..."
+if [ -f "install/setup.bash" ]; then
+    echo "DEBUG: install/setup.bash EXISTS (will NOT build)"
+else
+    echo "DEBUG: install/setup.bash NOT FOUND (will build)"
+fi
+echo "=========================================="
+
 # Fix permissions
 for dir in build install log; do
     if [ -d "$dir" ]; then
