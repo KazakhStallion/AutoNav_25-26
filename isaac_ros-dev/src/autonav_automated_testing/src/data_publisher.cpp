@@ -6,7 +6,6 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include "autonav_interfaces/msg/encoders.hpp"
 
 #include <string>
 #include <vector>
