@@ -4,6 +4,3 @@
 [submodule "isaac_ros-dev/src/zed-ros2-wrapper"]
 	path = isaac_ros-dev/src/zed-ros2-wrapper
 	url = https://github.com/stereolabs/zed-ros2-wrapper.git
-[submodule "isaac_ros-dev/src/sick_scan_xd"]
-	path = isaac_ros-dev/src/sick_scan_xd
-	url = https://github.com/SICKAG/sick_scan_xd.git
