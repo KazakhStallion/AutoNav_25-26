@@ -81,30 +81,27 @@ else
     echo "DEBUG: install/setup.bash NOT found (needs build)"
 fi
 
-# Fix permissions on build directories if they exist
+# Fix permissions
 for dir in build install log; do
     if [ -d "$dir" ]; then
         chown -R ${HOST_USER_UID}:${HOST_USER_GID} "$dir"
     fi
 done
 
-# Auto-install ROS dependencies and build if not already built
-# Use a marker file to track if build happened in THIS container
+# Auto-install ROS dependencies and build
 CONTAINER_BUILD_MARKER="/tmp/.ros_workspace_built_in_container"
 
 if [ -d "src" ] && [ ! -f "$CONTAINER_BUILD_MARKER" ]; then
-    echo "=========================================="
     echo "First run detected. Setting up ROS workspace..."
-    echo "=========================================="
     
     # Update rosdep and install dependencies
     echo "Updating package lists and installing dependencies..."
     apt-get update -qq
-    rosdep install --from-paths src --ignore-src -r -y
+    rosdep install --from-paths src --ignore-src -r -y -qq
     
     # Build workspace as the user (not root)
     echo "Building ROS workspace..."
-    gosu ${USERNAME} bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --merge-install"
+    gosu ${USERNAME} bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
     
     # Create marker file to indicate build completed
     touch "$CONTAINER_BUILD_MARKER"
@@ -114,9 +111,7 @@ if [ -d "src" ] && [ ! -f "$CONTAINER_BUILD_MARKER" ]; then
         echo "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" >> /home/${USERNAME}/.bashrc
     fi
     
-    echo "=========================================="
     echo "ROS workspace setup complete!"
-    echo "=========================================="
 fi
 
 exec gosu ${USERNAME} "$@"
