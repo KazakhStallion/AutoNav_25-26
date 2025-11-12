@@ -1,125 +1,122 @@
 #!/bin/bash
+#
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-set -e # makes script exit on command failure
+echo "Creating non-root container '${USERNAME}' for host user uid=${HOST_USER_UID}:gid=${HOST_USER_GID}"
 
-# ===== PARAMETERS =====
-IMAGE_TAG="dev:koopa-kingdom"
-CONTAINER_NAME="koopa-kingdom"
-HOST_WORKDIR="$HOME/AutoNav_25-26"
-CONTAINER_WORKDIR="/autonav"
-ENTRYPOINT="/usr/local/bin/scripts/entrypoint.sh"
-SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
-
-# ===== DETECT PLATFORM =====
-PLATFORM=$(uname -m)
-
-# ===== USERNAME =====
-USERNAME="${USERNAME:-admin}"
-
-DOCKER_ARGS=()
-
-# ===== ENVIRONMENT VARIABLES =====
-DOCKER_ARGS+=("-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
-DOCKER_ARGS+=("-e USER=${USERNAME}")
-DOCKER_ARGS+=("-e USERNAME=${USERNAME}")
-DOCKER_ARGS+=("-e HOST_USER_UID=$(id -u)")
-DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
-DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
-
-# ===== D-BUS & BLUETOOTH =====
-DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
-DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
-
-# ===== DISPLAY FORWARDING =====
-DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
-DOCKER_ARGS+=("-v $HOME/.Xauthority:/home/${USERNAME}/.Xauthority:rw")
-DOCKER_ARGS+=("-e DISPLAY")
-
-# ===== SSH AGENT =====
-if [[ -n $SSH_AUTH_SOCK ]]; then
-    DOCKER_ARGS+=("-v $SSH_AUTH_SOCK:/ssh-agent")
-    DOCKER_ARGS+=("-e SSH_AUTH_SOCK=/ssh-agent")
+if [ ! $(getent group ${HOST_USER_GID}) ]; then
+  groupadd --gid ${HOST_USER_GID} ${USERNAME} &>/dev/null
+else
+  CONFLICTING_GROUP_NAME=`getent group ${HOST_USER_GID} | cut -d: -f1`
+  groupmod -o --gid ${HOST_USER_GID} -n ${USERNAME} ${CONFLICTING_GROUP_NAME}
 fi
 
-# ===== JETSON SPECIFIC =====
-if [[ $PLATFORM == "aarch64" ]]; then
-    echo "Detected Jetson platform (aarch64)"
-    # Jetson-specific mounts and devices
-    DOCKER_ARGS+=("-v /usr/bin/tegrastats:/usr/bin/tegrastats")
-    DOCKER_ARGS+=("-v /tmp/:/tmp/")
-    DOCKER_ARGS+=("--pid=host")
-    
-    # jtop support
-    if [[ $(getent group jtop) ]]; then
-        DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
+if [ ! $(getent passwd ${HOST_USER_UID}) ]; then
+  useradd --no-log-init --uid ${HOST_USER_UID} --gid ${HOST_USER_GID} -m ${USERNAME} &>/dev/null
+else
+  CONFLICTING_USER_NAME=`getent passwd ${HOST_USER_UID} | cut -d: -f1`
+  usermod -l ${USERNAME} -u ${HOST_USER_UID} -m -d /home/${USERNAME} ${CONFLICTING_USER_NAME} &>/dev/null
+  mkdir -p /home/${USERNAME}
+  # Wipe files that may create issues for users with large uid numbers.
+  rm -f /var/log/lastlog /var/log/faillog
+fi
+
+# Update 'admin' user
+chown ${USERNAME}:${USERNAME} /home/${USERNAME}
+echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME}
+chmod 0440 /etc/sudoers.d/${USERNAME}
+adduser ${USERNAME} video >/dev/null
+adduser ${USERNAME} plugdev >/dev/null
+adduser ${USERNAME} sudo  >/dev/null
+adduser ${USERNAME} dialout  >/dev/null
+adduser ${USERNAME} bluetooth  >/dev/null
+adduser ${USERNAME} systemd-journal >/dev/null
+adduser ${USERNAME} zed >/dev/null
+
+source /opt/ros/humble/setup.bash # source ros setup
+
+
+# If jtop present, give the user access
+if [ -S /run/jtop.sock ]; then
+  JETSON_STATS_GID="$(stat -c %g /run/jtop.sock)"
+  addgroup --gid ${JETSON_STATS_GID} jtop >/dev/null
+  adduser ${USERNAME} jtop >/dev/null
+fi
+
+# Run all entrypoint additions
+shopt -s nullglob
+for addition in /usr/local/bin/scripts/entrypoint_additions/*.sh; do
+  if [[ "${addition}" =~ ".user." ]]; then
+    echo "Running entryrypoint extension: ${addition} as user ${USERNAME}"
+    #gosu ${USERNAME} ${addition}
+  else
+    echo "Sourcing entryrypoint extension: ${addition}"
+    source ${addition}
+  fi
+done
+
+# Restart udev daemon
+service udev restart
+
+# Change to workdir
+cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
+
+echo "DEBUG: Current directory: $(pwd)"
+echo "DEBUG: Checking for src directory..."
+if [ -d "src" ]; then
+    echo "DEBUG: src directory found"
+else
+    echo "DEBUG: src directory NOT found"
+fi
+echo "DEBUG: Checking for install/setup.bash..."
+if [ -f "install/setup.bash" ]; then
+    echo "DEBUG: install/setup.bash found (workspace already built)"
+else
+    echo "DEBUG: install/setup.bash NOT found (needs build)"
+fi
+
+# Fix permissions on build directories if they exist
+for dir in build install log; do
+    if [ -d "$dir" ]; then
+        chown -R ${HOST_USER_UID}:${HOST_USER_GID} "$dir"
     fi
+done
+
+# Auto-install ROS dependencies and build if not already built
+# Use a marker file to track if build happened in THIS container
+CONTAINER_BUILD_MARKER="/tmp/.ros_workspace_built_in_container"
+
+if [ -d "src" ] && [ ! -f "$CONTAINER_BUILD_MARKER" ]; then
+    echo "=========================================="
+    echo "First run detected. Setting up ROS workspace..."
+    echo "=========================================="
+    
+    # Update rosdep and install dependencies
+    echo "Updating package lists and installing dependencies..."
+    apt-get update -qq
+    rosdep install --from-paths src --ignore-src -r -y
+    
+    # Build workspace as the user (not root)
+    echo "Building ROS workspace..."
+    gosu ${USERNAME} bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --merge-install"
+    
+    # Create marker file to indicate build completed
+    touch "$CONTAINER_BUILD_MARKER"
+    
+    # Add workspace sourcing to user's bashrc
+    if ! grep -q "source.*install/setup.bash" /home/${USERNAME}/.bashrc; then
+        echo "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" >> /home/${USERNAME}/.bashrc
+    fi
+    
+    echo "=========================================="
+    echo "ROS workspace setup complete!"
+    echo "=========================================="
 fi
 
-# ===== MOUNTS & WORKING DIRECTORY =====
-DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
-DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
-DOCKER_ARGS+=("--workdir ${CONTAINER_WORKDIR}/isaac_ros-dev")
-DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
-DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
-
-# ===== PERSISTENT BUILD VOLUMES =====
-# These volumes persist the build artifacts across container runs
-# TEMPORARILY COMMENTED OUT TO DEBUG
-# DOCKER_ARGS+=("-v ${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/build")
-# DOCKER_ARGS+=("-v ${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
-# DOCKER_ARGS+=("-v ${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
-
-# ZED settings/resources
-if [[ -d "$HOME/zed/settings" ]]; then
-    DOCKER_ARGS+=("-v $HOME/zed/settings:/usr/local/zed/settings")
-fi
-if [[ -d "$HOME/zed/resources" ]]; then
-    DOCKER_ARGS+=("-v $HOME/zed/resources:/usr/local/zed/resources")
-fi
-
-DOCKER_ARGS+=("--entrypoint $ENTRYPOINT")
-
-# GPU env
-DOCKER_ARGS+=("-e NVIDIA_VISIBLE_DEVICES=all")
-DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
-
-# Ensure container user can open /dev/nvhost* and friends
-VID_GID=$(getent group video  | cut -d: -f3)
-REN_GID=$(getent group render | cut -d: -f3)
-INPUT_GID=$(getent group input | cut -d: -f3)
-if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add $VID_GID"); fi
-if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
-if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
-
-# ===== RE-USE EXISTING CONTAINER =====
-if [ "$(docker ps -a --quiet --filter status=running --filter name=^/${CONTAINER_NAME}$)" ]; then
-    echo "Container $CONTAINER_NAME is already running. Attaching..."
-    docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
-    exit 0
-fi
-
-# Check if container exists but is stopped
-if [ "$(docker ps -a --quiet --filter status=exited --filter name=^/${CONTAINER_NAME}$)" ]; then
-    echo "Container $CONTAINER_NAME exists but is stopped. Starting and attaching..."
-    docker start $CONTAINER_NAME
-    docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
-    exit 0
-fi
-
-# ===== CREATE NEW CONTAINER =====
-echo "Starting new container: $CONTAINER_NAME"
-echo "Mounting: ${HOST_WORKDIR} → ${CONTAINER_WORKDIR}"
-
-docker run -it \
-    --runtime nvidia \
-    --gpus all \
-    --privileged \
-    --network host \
-    --ipc host \
-    -e NVIDIA_VISIBLE_DEVICES=all \
-    -e NVIDIA_DRIVER_CAPABILITIES=all \
-    --device /dev/bus/usb:/dev/bus/usb \
-    ${DOCKER_ARGS[@]} \
-    --name "$CONTAINER_NAME" \
-    $IMAGE_TAG \
-    /bin/bash
+exec gosu ${USERNAME} "$@"
