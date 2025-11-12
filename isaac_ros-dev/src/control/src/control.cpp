@@ -5,6 +5,7 @@
 #include "autonomous.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "autonav_interfaces/msg/encoders.hpp"
 #include "autonav_interfaces/srv/configure_control.hpp"
 #include "std_msgs/msg/string.hpp"
 
