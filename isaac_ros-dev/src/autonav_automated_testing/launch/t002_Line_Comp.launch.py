@@ -126,8 +126,15 @@ def generate_launch_description():
         't002_automator.py'
     )
     
+    # Pass use_sim_time through to the automator process so its ROS clock matches the rest of the system
     test_automater = ExecuteProcess(
-        cmd=['python3', automater_script_path],
+        cmd=[
+            'python3',
+            automater_script_path,
+            '--ros-args',
+            '-p',
+            ['use_sim_time:=', LaunchConfiguration('use_sim_time')]
+        ],
         output='screen',
         name='t002_automater'
     )
