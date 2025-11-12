@@ -41,7 +41,6 @@ adduser ${USERNAME} zed >/dev/null
 
 source /opt/ros/humble/setup.bash # source ros setup
 
-
 # If jtop present, give the user access
 if [ -S /run/jtop.sock ]; then
   JETSON_STATS_GID="$(stat -c %g /run/jtop.sock)"
@@ -66,5 +65,19 @@ service udev restart
 
 # Change to workdir
 cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
+
+# Fix permissions on build directories if they exist
+for dir in build install log; do
+    if [ -d "$dir" ]; then
+        chown -R ${HOST_USER_UID}:${HOST_USER_GID} "$dir"
+    fi
+done
+
+# Source workspace
+if [ -f "${WORKDIR}/isaac_ros-dev/install/setup.bash" ]; then
+    if ! grep -q "source.*install/setup.bash" /home/${USERNAME}/.bashrc; then
+        echo "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" >> /home/${USERNAME}/.bashrc
+    fi
+fi
 
 exec gosu ${USERNAME} "$@"

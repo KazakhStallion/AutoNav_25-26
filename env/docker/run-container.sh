@@ -2,7 +2,7 @@
 
 set -e # makes script exit on command failure
 
-# ===== PARAMETERS =====
+# PARAMETERS
 IMAGE_TAG="dev:koopa-kingdom"
 CONTAINER_NAME="koopa-kingdom"
 HOST_WORKDIR="$HOME/AutoNav_25-26"
@@ -10,15 +10,15 @@ CONTAINER_WORKDIR="/autonav"
 ENTRYPOINT="/usr/local/bin/scripts/entrypoint.sh"
 SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
 
-# ===== DETECT PLATFORM =====
+# DETECT PLATFORM
 PLATFORM=$(uname -m)
 
-# ===== USERNAME =====
+# USERNAME
 USERNAME="${USERNAME:-admin}"
 
 DOCKER_ARGS=()
 
-# ===== ENVIRONMENT VARIABLES =====
+# ENVIRONMENT VARIABLES
 DOCKER_ARGS+=("-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
 DOCKER_ARGS+=("-e USER=${USERNAME}")
 DOCKER_ARGS+=("-e USERNAME=${USERNAME}")
@@ -26,22 +26,22 @@ DOCKER_ARGS+=("-e HOST_USER_UID=$(id -u)")
 DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
 DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 
-# ===== D-BUS & BLUETOOTH =====
+# D-BUS & BLUETOOTH
 DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
 DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
 
-# ===== DISPLAY FORWARDING =====
+# DISPLAY FORWARDING
 DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
 DOCKER_ARGS+=("-v $HOME/.Xauthority:/home/${USERNAME}/.Xauthority:rw")
 DOCKER_ARGS+=("-e DISPLAY")
 
-# ===== SSH AGENT =====
+# SSH AGENT
 if [[ -n $SSH_AUTH_SOCK ]]; then
     DOCKER_ARGS+=("-v $SSH_AUTH_SOCK:/ssh-agent")
     DOCKER_ARGS+=("-e SSH_AUTH_SOCK=/ssh-agent")
 fi
 
-# ===== JETSON SPECIFIC =====
+# JETSON SPECIFIC
 if [[ $PLATFORM == "aarch64" ]]; then
     echo "Detected Jetson platform (aarch64)"
     # Jetson-specific mounts and devices
@@ -55,12 +55,17 @@ if [[ $PLATFORM == "aarch64" ]]; then
     fi
 fi
 
-# ===== MOUNTS & WORKING DIRECTORY =====
+# MOUNTS & WORKING DIRECTORY
 DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
 DOCKER_ARGS+=("--workdir ${CONTAINER_WORKDIR}/isaac_ros-dev")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
+
+# PERSISTENT BUILD VOLUMES
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/build")
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
+DOCKER_ARGS+=("-v ${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
 
 # ZED settings/resources
 if [[ -d "$HOME/zed/settings" ]]; then
@@ -84,23 +89,26 @@ if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add $VID_GID"); fi
 if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
 if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
 
-# External USB devices (e.g., LiDAR, serial devices)
-DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
-DOCKER_ARGS+=("--device=/dev/ttyTHS1") # E-stop
-DOCKER_ARGS+=("--device=/dev/ttyUSB0") # GPS
-
-# ===== RE-USE EXISTING CONTAINER =====
-if [ "$(docker ps -a --quiet --filter status=running --filter name=$CONTAINER_NAME)" ]; then
+# RE-USE EXISTING CONTAINER
+if [ "$(docker ps -a --quiet --filter status=running --filter name=^/${CONTAINER_NAME}$)" ]; then
     echo "Container $CONTAINER_NAME is already running. Attaching..."
     docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
     exit 0
 fi
 
-# ===== CREATE NEW CONTAINER =====
+# Check if container exists but is stopped
+if [ "$(docker ps -a --quiet --filter status=exited --filter name=^/${CONTAINER_NAME}$)" ]; then
+    echo "Container $CONTAINER_NAME exists but is stopped. Starting and attaching..."
+    docker start $CONTAINER_NAME
+    docker exec -i -t -u ${USERNAME} --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" $CONTAINER_NAME /bin/bash "$@"
+    exit 0
+fi
+
+# CREATE NEW CONTAINER
 echo "Starting new container: $CONTAINER_NAME"
 echo "Mounting: ${HOST_WORKDIR} → ${CONTAINER_WORKDIR}"
 
-docker run -it --rm \
+docker run -it \
     --runtime nvidia \
     --gpus all \
     --privileged \
