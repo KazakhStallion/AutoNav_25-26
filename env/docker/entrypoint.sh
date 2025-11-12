@@ -67,20 +67,21 @@ service udev restart
 # Change to workdir
 cd ${WORKDIR}/isaac_ros-dev 2>/dev/null || cd ${WORKDIR} 2>/dev/null || true
 
-# Fix permissions on build directories if they exist
+# Fix permissions
 for dir in build install log; do
     if [ -d "$dir" ]; then
         chown -R ${HOST_USER_UID}:${HOST_USER_GID} "$dir"
     fi
 done
 
-# Auto-install ROS dependencies and build if not already built
-if [ -d "src" ] && [ ! -d "install" ]; then
+# Auto-install ROS dependencies and build
+if [ -d "src" ] && [ ! -f "install/setup.bash" ]; then
     echo "First run detected. Setting up ROS workspace..."
     
     # Update rosdep and install dependencies
     echo "Updating package lists and installing dependencies..."
     apt-get update -qq
+    rosdep update
     rosdep install --from-paths src --ignore-src -r -y
     
     # Build workspace as the user (not root)
