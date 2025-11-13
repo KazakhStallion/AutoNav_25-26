@@ -12,7 +12,7 @@ from launch import LaunchDescription
 def generate_launch_description():
 
     zed_pkg = os.path.join(get_package_share_directory('zed_wrapper'), 'launch', 'zed_camera.launch.py')
-    sick_pkg = os.path.join(get_package_share_directory('sick_scan_xd'), 'launch', 'sick_multiscan.launch.py')
+    #sick_pkg = os.path.join(get_package_share_directory('sick_scan_xd'), 'launch', 'sick_multiscan.launch.py')
 
 
     # ros2 launch sick_scan_xd sick_multiscan.launch.py hostname:=192.168.0.1 udp_receiver_ip:="192.168.0.2"
