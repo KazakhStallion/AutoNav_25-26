@@ -18,7 +18,7 @@ data_publisher:
     # /plan                          - Navigation path plan (nav_msgs/Path)
     #
     # --- GPS & POSITIONING ---
-    # /gps/fix                       - GPS position (sensor_msgs/NavSatFix) - lat/lon/alt
+    # /gps_fix                       - GPS position (sensor_msgs/NavSatFix) - lat/lon/alt
     # /gps/filtered                  - Filtered GPS data (sensor_msgs/NavSatFix)
     # /odometry/gps                  - GPS-based odometry (nav_msgs/Odometry)
     # /odometry/local_ekf            - Local EKF odometry (nav_msgs/Odometry)
@@ -60,10 +60,10 @@ data_publisher:
     #
     
     # Test 001: GPS Calibration - Validates GPS accuracy and waypoint navigation
-    t001: ["/gps/fix", "/odom", "/tf", "/encoders", "/cmd_vel"]
+    t001: ["/gps_fix", "/odom", "/tf", "/encoders", "/cmd_vel"]
     
     # Test 002: Line Compliance - Monitor GPS, IMU, LiDAR, and Encoders for line following
-    t002: ["/gps/fix", "/imu/data", "/scan", "/encoders", "/odom", "/cmd_vel", "/line_detection/lines"]
+    t002: ["/gps_fix", "/imu/data", "/scan", "/encoders", "/odom", "/cmd_vel", "/line_detection/lines"]
     
     # Test 003: Forward Movement
     t003: ["/odom", "/encoders", "/cmd_vel", "/camera/image_raw"]
