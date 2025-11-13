@@ -1,5 +1,0 @@
-log/
-install/
-build/
-.vscode
-!.vscode/launch.json
