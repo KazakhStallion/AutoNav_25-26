@@ -34,7 +34,7 @@ def generate_launch_description():
     )
        
     print(f"zed: {zed_pkg}")
-    print(f"sick: {sick_pkg}")
+    #print(f"sick: {sick_pkg}")
 
     zed = IncludeLaunchDescription(
             PythonLaunchDescriptionSource ([zed_pkg]), launch_arguments={'camera_model':LaunchConfiguration('camera_model')}.items()
