@@ -99,7 +99,7 @@ public:
 
 private:
     void subscribe_to_topic(const std::string& topic) {
-        if (topic == "/gps/fix") {
+        if (topic == "/gps_fix") {
             auto sub = this->create_subscription<sensor_msgs::msg::NavSatFix>(
                 topic, 10,
                 [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
