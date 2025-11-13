@@ -21,7 +21,7 @@ def generate_launch_description():
     # Declare launch arguments
     use_sim_time = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='False',
+        default_value='false',
         description='Use simulation (Gazebo) clock if true'
     )
 
@@ -134,7 +134,7 @@ def generate_launch_description():
             '--ros-args',
             '-p',
             PythonExpression([
-                "'use_sim_time:=' + str(", LaunchConfiguration('use_sim_time'), ")"
+                "'use_sim_time:=' + '", LaunchConfiguration('use_sim_time'), "'"
             ])
         ],
         output='screen',
