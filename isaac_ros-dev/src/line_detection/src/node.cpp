@@ -165,78 +165,116 @@ sensor_msgs::msg::PointCloud2 createPointCloud(const std::vector<std::array<floa
 /**
  * Converts a list of image indicies to map frame coordinates  
  * */
-std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(const sensor_msgs::msg::Image::SharedPtr depth_msg, int2* line_points, int line_points_len) {
+std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
+    const sensor_msgs::msg::Image::SharedPtr depth_msg, 
+    int2* line_points, 
+    int line_points_len) 
+{
+    std::vector<Eigen::Vector3d> depth_line_points;
+    
+    if (line_points_len == 0) {
+        return depth_line_points;
+    }
 
-	std::vector<Eigen::Vector3d> depth_line_points;
-
-    // extract depth value TODO validate
     const float* depth_data = reinterpret_cast<const float*>(depth_msg->data.data());
+    std::vector<std::array<float, 3>> pc_vec;
+    std::string frame_id = depth_msg->header.frame_id;
 
-	std::vector<std::array<float, 3>> pc_vec;
-	std::string frame_id = depth_msg->header.frame_id;
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 10000,
+        "Processing %d line points from frame: %s", line_points_len, frame_id.c_str());
 
+    int valid_depth_count = 0;
+    int invalid_depth_count = 0;
+    int tf_success_count = 0;
+    int tf_fail_count = 0;
 
-	for (int i=0; i < line_points_len; i++){
+    // Check if transform is available
+    bool transform_available = false;
+    geometry_msgs::msg::TransformStamped transform;
+    
+    try {
+        // Try to get the transform once before processing all points
+        transform = tf_buffer.lookupTransform(
+            "map", 
+            frame_id, 
+            tf2::TimePointZero,
+            std::chrono::milliseconds(100)  // 100ms timeout
+        );
+        transform_available = true;
+        RCLCPP_INFO_ONCE(get_logger(), "Transform from %s to map found successfully", frame_id.c_str());
+    } catch (const tf2::TransformException& ex) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+            "TF transform not available from %s to map: %s", frame_id.c_str(), ex.what());
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+            "Run: ros2 run tf2_ros tf2_echo map %s (to debug)", frame_id.c_str());
+        
+        // Still process points to camera frame and publish pointcloud for visualization
+        transform_available = false;
+    }
 
-		const float depth_cm = depth_data[line_points[i].y * depth_msg->width + line_points[i].x];
-		
-		#ifdef DEBUG_2
-		RCLCPP_INFO(get_logger(), "x: %d, y: %d, depth: %f\n", line_points[i].y, line_points[i].x, depth_cm);
-		#endif
-		if (depth_cm <= 0.0 || std::isnan(depth_cm)) {
-			RCLCPP_WARN(get_logger(), "Invalid depth at (%d,%d)", line_points[i].x, line_points[i].y);
-			continue;
-		}
+    for (int i = 0; i < line_points_len; i++) {
+        // Check bounds
+        if (line_points[i].y >= (int)depth_msg->height || line_points[i].x >= (int)depth_msg->width) {
+            RCLCPP_WARN_ONCE(get_logger(), "Line point outside image bounds: (%d, %d)", 
+                line_points[i].x, line_points[i].y);
+            continue;
+        }
 
-		#ifdef DEBUG_LOG
-		RCLCPP_INFO(this->get_logger(), "detected image index: %d, %d", line_points[i].x, line_points[i].y);
-		#endif
+        const float depth_cm = depth_data[line_points[i].y * depth_msg->width + line_points[i].x];
+        
+        if (depth_cm <= 0.0 || std::isnan(depth_cm)) {
+            invalid_depth_count++;
+            continue;
+        }
+        
+        valid_depth_count++;
 
-		// convert to meters and project to 3D
-		const double depth_m = depth_cm / 100.0;
-		const cv::Point3d ray = camera_model_.projectPixelTo3dRay(
-		cv::Point2d(line_points[i].x, line_points[i].y));
-		
-		// create camera-frame point
-		geometry_msgs::msg::PointStamped camera_point;
-		camera_point.header = depth_msg->header;
-		float point_x = ray.x * depth_cm;
-		float point_y = ray.y * depth_cm;
-		float point_z = ray.z * depth_cm;
-		camera_point.point.x = point_x;
-		camera_point.point.y = point_y;
-		camera_point.point.z = point_z;
+        const double depth_m = depth_cm / 100.0;
+        const cv::Point3d ray = camera_model_.projectPixelTo3dRay(
+            cv::Point2d(line_points[i].x, line_points[i].y));
+        
+        // Create point in camera frame
+        geometry_msgs::msg::PointStamped camera_point;
+        camera_point.header = depth_msg->header;
+        float point_x = ray.x * depth_cm;
+        float point_y = ray.y * depth_cm;
+        float point_z = ray.z * depth_cm;
+        camera_point.point.x = point_x;
+        camera_point.point.y = point_y;
+        camera_point.point.z = point_z;
 
-		pc_vec.push_back({point_x, point_y, point_z});
+        // Add to pointcloud for visualization (always works)
+        pc_vec.push_back({point_x, point_y, point_z});
 
+        // Try to transform to map frame if available
+        if (transform_available) {
+            try {
+                geometry_msgs::msg::PointStamped map_point;
+                tf2::doTransform(camera_point, map_point, transform);
+                
+                depth_line_points.emplace_back(map_point.point.x, map_point.point.y, 0);
+                tf_success_count++;
+                
+            } catch (const tf2::TransformException& ex) {
+                tf_fail_count++;
+                if (tf_fail_count == 1) {  // Only log first error
+                    RCLCPP_ERROR(get_logger(), "Transform error: %s", ex.what());
+                }
+            }
+        }
+    }
 
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 5000,
+        "Depth: %d valid, %d invalid | Transform: %d success, %d failed", 
+        valid_depth_count, invalid_depth_count, tf_success_count, tf_fail_count);
 
-		// transform to map frame
-		try {
+    // Publish pointcloud for visualization even if transform failed
+    if (!pc_vec.empty()) {
+        sensor_msgs::msg::PointCloud2 pointcloud = createPointCloud(pc_vec, frame_id);
+        _line_point_cloud_pub->publish(pointcloud);
+    }
 
-		geometry_msgs::msg::TransformStamped transform = tf_buffer.lookupTransform("map", camera_point.header.frame_id, tf2::TimePointZero);
-		geometry_msgs::msg::PointStamped map_point;
-		tf2::doTransform(camera_point,map_point, transform);
-		
-		#ifdef DEBUG_3
-		RCLCPP_INFO(this->get_logger(), "Map coordinates: (%.2f, %.2f, %.2f)",
-					map_point.point.x, map_point.point.y, map_point.point.z);
-		#endif
-		
-		// append to map point coords
-		depth_line_points.emplace_back(map_point.point.x, map_point.point.y, 0);
-		
-		} catch (const tf2::TransformException& ex) {
-		RCLCPP_ERROR(get_logger(), "TF error: %s", ex.what());
-
-		}
-
-	}
-
-	sensor_msgs::msg::PointCloud2 pointcloud = createPointCloud(pc_vec, frame_id);
-	_line_point_cloud_pub->publish(pointcloud);
-
-	return depth_line_points;
+    return depth_line_points;
 }
 
 void LineDetectorNode::line_service(const std::shared_ptr<autonav_interfaces::srv::AnvLines::Request> request,
