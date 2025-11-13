@@ -10,7 +10,7 @@
 
 /**
  * Detects and returns pixels likely belonging to lines. 
- * Most noise detected is either far outside the couse, or is part of an obstacle.
+ * Most noise detected is either far outside the course, or is part of an obstacle.
  * Thus, we are happy to map these pixels as obstacles on the map, since the robot will avoid them anyways. 
  * 
  */

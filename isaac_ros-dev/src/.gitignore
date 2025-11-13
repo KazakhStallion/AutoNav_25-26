@@ -1,4 +1,5 @@
 log/
 install/
 build/
-.vscode/
+.vscode
+!.vscode/launch.json
