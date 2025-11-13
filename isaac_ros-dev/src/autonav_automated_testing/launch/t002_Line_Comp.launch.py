@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
@@ -133,7 +133,9 @@ def generate_launch_description():
             automater_script_path,
             '--ros-args',
             '-p',
-            ['use_sim_time:=', LaunchConfiguration('use_sim_time')]
+            PythonExpression([
+                "'use_sim_time:=' + str(", LaunchConfiguration('use_sim_time'), ")"
+            ])
         ],
         output='screen',
         name='t002_automater'
