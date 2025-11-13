@@ -51,9 +51,8 @@ def generate_launch_description():
 
 
 
-    sick = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource ([sick_pkg]), launch_arguments=sick_args.items()
-    )
+    #sick = IncludeLaunchDescription(PythonLaunchDescriptionSource ([sick_pkg]), launch_arguments=sick_args.items())
+    
     return LaunchDescription([
         camera_model,
         hostname,
