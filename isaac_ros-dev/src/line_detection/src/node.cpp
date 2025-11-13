@@ -319,86 +319,170 @@ void LineDetectorNode::line_service(const std::shared_ptr<autonav_interfaces::sr
 
 void LineDetectorNode::line_callback()
 {
+    // CHECKPOINT 1: Configuration
+    if (!configured_){
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+            "Not configured - waiting for camera info");
+        return;
+    }
+    
+    // CHECKPOINT 2: Timer enabled
+    if (!enable_timer_){
+        return;
+    }
 
-	// take camera data, turn it into cv::Mat 8UC1, and simply call detect
-	// detect will return a pointer to an array of (x,y) line points,
-	// and the length of the array. 
+    // CHECKPOINT 3: Camera image received
+    sensor_msgs::msg::Image::SharedPtr camera_msg = [this]() {
+        std::lock_guard<std::mutex> lock(callback_lock);
+        return latest_img;
+    }();
+    
+    if (!camera_msg) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "No camera image received yet on topic: %s", 
+            this->get_parameter("camera_topic").as_string().c_str());
+        return;
+    }
+    
+    // CHECKPOINT 4: Depth image received
+    sensor_msgs::msg::Image::SharedPtr depth_camera_msg = [this]() {
+        std::lock_guard<std::mutex> lock(depth_callback_lock);
+        return latest_depth_img;
+    }();
 
-	if (!configured_ || !enable_timer_){
-		return;
-	}
+    if (!depth_camera_msg) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "No depth image received yet on topic: %s",
+            this->get_parameter("depth_camera_topic").as_string().c_str());
+        return;
+    }
 
-	// read latest camera message thread safe
-	sensor_msgs::msg::Image::SharedPtr camera_msg = [this]() {
-		std::lock_guard<std::mutex> lock(callback_lock);
-		return latest_img;
-		
-	}();
-	sensor_msgs::msg::Image::SharedPtr depth_camera_msg = [this]() {
-		std::lock_guard<std::mutex> lock(depth_callback_lock);
-		return latest_depth_img;
-		
-	}();
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "Processing image: %s %dx%d", 
+        camera_msg->encoding.c_str(),
+        camera_msg->width, 
+        camera_msg->height);
 
+    // CHECKPOINT 5: CV Bridge conversion
+    cv_bridge::CvImagePtr cv_ptr;
+    try {
+        // Handle different encodings from ZED camera
+        if (camera_msg->encoding == "bgra8") {
+            // BGRA -> BGR
+            cv_ptr = cv_bridge::toCvCopy(camera_msg, sensor_msgs::image_encodings::BGR8);
+            // BGR -> Gray
+            cv::Mat gray_img;
+            cv::cvtColor(cv_ptr->image, gray_img, cv::COLOR_BGR2GRAY);
+            cv_ptr->image = gray_img;
+            cv_ptr->encoding = sensor_msgs::image_encodings::MONO8;
+        }
+        else if (camera_msg->encoding == "bgr8") {
+            cv_ptr = cv_bridge::toCvCopy(camera_msg, sensor_msgs::image_encodings::BGR8);
+            cv::Mat gray_img;
+            cv::cvtColor(cv_ptr->image, gray_img, cv::COLOR_BGR2GRAY);
+            cv_ptr->image = gray_img;
+            cv_ptr->encoding = sensor_msgs::image_encodings::MONO8;
+        }
+        else if (camera_msg->encoding == "rgb8") {
+            cv_ptr = cv_bridge::toCvCopy(camera_msg, sensor_msgs::image_encodings::RGB8);
+            cv::Mat gray_img;
+            cv::cvtColor(cv_ptr->image, gray_img, cv::COLOR_RGB2GRAY);
+            cv_ptr->image = gray_img;
+            cv_ptr->encoding = sensor_msgs::image_encodings::MONO8;
+        }
+        else if (camera_msg->encoding == "mono8") {
+            cv_ptr = cv_bridge::toCvCopy(camera_msg, sensor_msgs::image_encodings::MONO8);
+        }
+        else {
+            RCLCPP_ERROR(this->get_logger(), "Unsupported encoding: %s", camera_msg->encoding.c_str());
+            return;
+        }
+    } catch (cv_bridge::Exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+        return;
+    }
+    
+    cv::Mat camera_img = cv_ptr->image;
+    
+    // Validate the image
+    if (camera_img.empty() || camera_img.data == nullptr) {
+        RCLCPP_ERROR(this->get_logger(), "Converted image is empty");
+        return;
+    }
+    
+    if (camera_img.type() != CV_8UC1) {
+        RCLCPP_ERROR(this->get_logger(), "Image is not CV_8UC1 after conversion, type: %d", 
+                     camera_img.type());
+        return;
+    }
 
-	#ifdef DEBUG_LOG
-	RCLCPP_INFO(this->get_logger(), "camera message read");
-	#endif
+    // CHECKPOINT 6: CUDA Line detection
+    std::pair<int2*,int*> line_pair;
+    try {
+        line_pair = lines::detect_line_pixels(camera_img);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Line detection failed: %s", e.what());
+        return;
+    }
+    
+    int2* line_points;
+    int* line_points_len;
+    std::tie(line_points, line_points_len) = line_pair;
 
-	// convert camera image to cv::Mat for line detection
-	cv_bridge::CvImagePtr cv_ptr;
-	try {
-		cv_ptr = cv_bridge::toCvCopy(camera_msg, sensor_msgs::image_encodings::MONO8);  
-	} catch (cv_bridge::Exception& e) {
-		RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
-		return;
-	}
-	cv::Mat camera_img = cv_ptr->image;
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "Detected %d line pixels", *line_points_len);
+    
+    if (*line_points_len == 0) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 10000,
+            "No line pixels detected - check brightness (MEW_THRESHOLD=200) and camera view");
+        delete[] line_points;
+        delete line_points_len;
+        return;
+    }
 
-	#ifdef DEBUG_LOG
-	RCLCPP_INFO(this->get_logger(), "camera bridge complete");
-	#endif
+    // CHECKPOINT 7: Transform to map frame
+    std::vector<Eigen::Vector3d> map_points;
+    try {
+        map_points = map_transform(depth_camera_msg, line_points, *line_points_len);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Transform failed: %s", e.what());
+        delete[] line_points;
+        delete line_points_len;
+        return;
+    }
 
-	// detect lines
-	std::pair<int2*,int*> line_pair = lines::detect_line_pixels(camera_img);
-	int2* line_points;
-	int* line_points_len;
-	std::tie(line_points, line_points_len) = line_pair;
+    if (map_points.empty()) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+            "No valid map points after transform (all depth values invalid or TF failed)");
+        delete[] line_points;
+        delete line_points_len;
+        return;
+    }
 
-	#ifdef DEBUG_LOG
-	RCLCPP_INFO(this->get_logger(), "lines detected. points: %d", *line_points_len);
-	#endif
-	
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "Transformed to %zu map points (%.1f%% valid)",
+        map_points.size(), 
+        100.0 * map_points.size() / *line_points_len);
 
-	std::vector<Eigen::Vector3d> map_points = map_transform(depth_camera_msg, line_points, *line_points_len);
+    // CHECKPOINT 8: Create and publish message
+    auto message = autonav_interfaces::msg::LinePoints();
+    for (const auto & point: map_points) {
+        geometry_msgs::msg::Vector3 vec_msg;
+        vec_msg.x = point.x();
+        vec_msg.y = point.y();
+        vec_msg.z = point.z();
+        message.points.emplace_back(vec_msg);
+    }
 
+    _line_pub->publish(message);
+    
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+        "Published %zu line points", message.points.size());
 
-	#ifdef DEBUG_LOG
-	RCLCPP_INFO(this->get_logger(), "transform 2 complete");
-	#endif
-	
-
-	auto message = autonav_interfaces::msg::LinePoints();
-	// populate service response
-	for (const auto & point: map_points) {
-		geometry_msgs::msg::Vector3 vec_msg;
-		vec_msg.x = point.x();
-		vec_msg.y = point.y();
-		vec_msg.z = point.z();
-		message.points.emplace_back(vec_msg);
-
-	}
-
-	_line_pub->publish(message);
-
-
-	// free mem
-	delete[] line_points;
-	delete line_points_len;
-
+    // free mem
+    delete[] line_points;
+    delete line_points_len;
 }
-
-
 
 
 int main(int argc, char** argv) {
