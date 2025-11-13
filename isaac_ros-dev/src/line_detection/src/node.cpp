@@ -186,19 +186,27 @@ std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
     std::string frame_id = depth_msg->header.frame_id;
 
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 10000,
-        "Processing %d line points from frame: %s", line_points_len, frame_id.c_str());
+        "Processing %d line points from frame: %s, encoding: %s", 
+        line_points_len, frame_id.c_str(), depth_msg->encoding.c_str());
 
     int valid_depth_count = 0;
     int invalid_depth_count = 0;
     int tf_success_count = 0;
     int tf_fail_count = 0;
 
-    // Check if transform is available AND CURRENT
+    // ZED depth is 32FC1 (32-bit float, single channel) in METERS
+    bool depth_in_meters = (depth_msg->encoding == "32FC1");
+    
+    RCLCPP_INFO_ONCE(get_logger(), 
+        "Depth encoding: %s (units: %s)", 
+        depth_msg->encoding.c_str(),
+        depth_in_meters ? "meters" : "unknown - assuming meters");
+
+    // Check if transform is available
     bool transform_available = false;
     geometry_msgs::msg::TransformStamped transform;
     
     try {
-        // Check if the latest available transform is recent enough
         transform = tf_buffer.lookupTransform(
             "map", 
             frame_id, 
@@ -206,27 +214,23 @@ std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
             std::chrono::milliseconds(50)
         );
         
-        // Check if transform is recent (within last 1 second)
         auto now = this->get_clock()->now();
         auto transform_time = rclcpp::Time(transform.header.stamp);
         auto age = (now - transform_time).seconds();
         
         if (age > 1.0) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                "Transform from %s to map is stale (%.2f seconds old). Is SLAM running?", 
-                frame_id.c_str(), age);
+                "Transform is stale (%.2f sec old). Is SLAM running?", age);
             transform_available = false;
         } else {
             transform_available = true;
             RCLCPP_INFO_ONCE(get_logger(), 
-                "Transform from %s to map found (age: %.3f sec)", 
-                frame_id.c_str(), age);
+                "Transform found (age: %.3f sec)", age);
         }
         
     } catch (const tf2::TransformException& ex) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-            "TF transform not available from %s to map: %s. Is SLAM running?", 
-            frame_id.c_str(), ex.what());
+            "TF not available: %s", ex.what());
         transform_available = false;
     }
 
@@ -238,53 +242,69 @@ std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
             continue;
         }
 
-        // Get depth value
+        // Get depth value (in meters for ZED)
         size_t depth_index = line_points[i].y * depth_msg->width + line_points[i].x;
-        const float depth_cm = depth_data[depth_index];
+        float depth_meters = depth_data[depth_index];
         
-        // Validate depth (10cm to 20m range)
-        if (depth_cm <= 10.0f || depth_cm > 2000.0f || 
-            std::isnan(depth_cm) || std::isinf(depth_cm)) {
+        // Debug first few
+        if (valid_depth_count + invalid_depth_count < 3) {
+            RCLCPP_INFO(get_logger(), 
+                "Point[%d] at pixel (%d,%d): depth=%.3f meters", 
+                i, line_points[i].x, line_points[i].y, depth_meters);
+        }
+        
+        // Validate depth: 0.1m (10cm) to 20m range
+        if (depth_meters <= 0.0f || std::isnan(depth_meters) || std::isinf(depth_meters)) {
             invalid_depth_count++;
+            continue;
+        }
+        
+        if (depth_meters < 0.1f || depth_meters > 20.0f) {
+            invalid_depth_count++;
+            if (invalid_depth_count <= 3) {
+                RCLCPP_WARN(get_logger(), 
+                    "Depth out of range at (%d,%d): %.3f meters (valid: 0.1-20.0m)", 
+                    line_points[i].x, line_points[i].y, depth_meters);
+            }
             continue;
         }
         
         valid_depth_count++;
 
-        // Project to 3D
+        // Project pixel to 3D ray
         cv::Point3d ray = camera_model_.projectPixelTo3dRay(
             cv::Point2d(line_points[i].x, line_points[i].y));
         
-        // Scale ray by depth (keep in cm for pointcloud)
-        float point_x = static_cast<float>(ray.x * depth_cm);
-        float point_y = static_cast<float>(ray.y * depth_cm);
-        float point_z = static_cast<float>(ray.z * depth_cm);
+        // Scale ray by depth to get 3D point in camera frame (meters)
+        float point_x = static_cast<float>(ray.x * depth_meters);
+        float point_y = static_cast<float>(ray.y * depth_meters);
+        float point_z = static_cast<float>(ray.z * depth_meters);
         
         // Sanity check
         if (std::isnan(point_x) || std::isnan(point_y) || std::isnan(point_z)) {
+            RCLCPP_WARN_ONCE(get_logger(), "NaN in projected point");
             continue;
         }
 
-        // Add to pointcloud for visualization (in camera frame, cm units)
+        // Add to pointcloud for visualization (in meters, camera frame)
         pc_vec.push_back({point_x, point_y, point_z});
 
-        // Transform to map frame if transform is available and recent
+        // Transform to map frame if available
         if (transform_available) {
             try {
-                // Create point in camera frame (convert to meters for TF)
+                // Create point in camera frame
                 geometry_msgs::msg::PointStamped camera_point;
                 camera_point.header = depth_msg->header;
-                camera_point.point.x = point_x / 100.0;  // cm to meters
-                camera_point.point.y = point_y / 100.0;
-                camera_point.point.z = point_z / 100.0;
+                camera_point.point.x = point_x;
+                camera_point.point.y = point_y;
+                camera_point.point.z = point_z;
                 
                 // Transform to map
                 geometry_msgs::msg::PointStamped map_point;
                 tf2::doTransform(camera_point, map_point, transform);
                 
                 // Validate result
-                if (!std::isnan(map_point.point.x) && !std::isnan(map_point.point.y) &&
-                    !std::isinf(map_point.point.x) && !std::isinf(map_point.point.y)) {
+                if (!std::isnan(map_point.point.x) && !std::isnan(map_point.point.y)) {
                     depth_line_points.emplace_back(
                         map_point.point.x, 
                         map_point.point.y, 
@@ -303,16 +323,15 @@ std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
     }
 
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 5000,
-        "Depth: %d valid, %d invalid | TF: %d success, %d fail (available: %s)", 
-        valid_depth_count, invalid_depth_count, 
-        tf_success_count, tf_fail_count,
-        transform_available ? "yes" : "no");
+        "Results: %d valid depth, %d invalid | %d transformed to map", 
+        valid_depth_count, invalid_depth_count, tf_success_count);
 
     // Publish pointcloud for visualization
     if (!pc_vec.empty()) {
         try {
             sensor_msgs::msg::PointCloud2 pointcloud = createPointCloud(pc_vec, frame_id);
             _line_point_cloud_pub->publish(pointcloud);
+            RCLCPP_INFO_ONCE(get_logger(), "Publishing pointcloud with %zu points", pc_vec.size());
         } catch (const std::exception& e) {
             RCLCPP_ERROR_ONCE(get_logger(), "Failed to publish pointcloud: %s", e.what());
         }
