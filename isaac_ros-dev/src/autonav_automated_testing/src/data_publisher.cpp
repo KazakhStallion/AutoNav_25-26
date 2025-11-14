@@ -110,7 +110,7 @@ private:
                 });
             dynamic_subscribers_.push_back(sub);
         }
-        else if (topic == "/imu/data") {
+        else if (topic == "/zed/zed_node/imu/data") {
             auto sub = this->create_subscription<sensor_msgs::msg::Imu>(
                 topic, rclcpp::SensorDataQoS(),
                 [this](const sensor_msgs::msg::Imu::SharedPtr msg) {
@@ -240,7 +240,7 @@ private:
         }
         // Publish IMU data
         if (!latest_imu_data_.empty()) {
-            msg.data = "/imu/data,Imu," + latest_imu_data_;
+            msg.data = "/zed/zed_node/imu/data,Imu," + latest_imu_data_;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing IMU: %s", msg.data.c_str());
