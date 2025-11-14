@@ -3,4 +3,3 @@ install
 log
 logs
 .vscode
-!.vscode/launch.json
