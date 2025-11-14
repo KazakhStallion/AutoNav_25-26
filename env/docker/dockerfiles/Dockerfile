@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
     bluez \
     bluez-tools \
+    bluez-utils \
+    bluetoothctl \
     dbus \
     evtest \
     joystick \
