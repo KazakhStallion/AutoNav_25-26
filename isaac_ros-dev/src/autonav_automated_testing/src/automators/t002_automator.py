@@ -167,24 +167,25 @@ class T002Automator(BaseAutomator):
                 return
 
     def test_actions(self):
-        """
-        Test-specific actions for T002 Line Compliance
-        - Start line following behavior
-        - Robot should stay between white lines using camera input
-        - Continue until 110ft distance is traveled
-        """
-        self.get_logger().info('Starting line compliance test - robot will follow white lines')
+        self.get_logger().info('Starting line compliance test')
         self.line_following_active = True
-        self.waiting_for_trigger = False  # Stop printing waiting message
+        self.waiting_for_trigger = False
         
-        # Stop the waiting timer
         if hasattr(self, 'waiting_timer'):
             self.waiting_timer.cancel()
         
-        # Send a fake joystick X button press to control node to enable autonomous mode
+        # Send X button to control FIRST
         self._send_x_button_to_control()
         
-        self.get_logger().info('Line following activated - control node should now be in autonomous mode')
+        # THEN enable data collection after a short delay
+        def enable_data_collection():
+            toggle_msg = Bool()
+            toggle_msg.data = True
+            self.toggle_pub.publish(toggle_msg)
+            self.get_logger().info('Data collection enabled - robot is now moving')
+        
+        # Wait 1 second for control node to switch modes
+        self.create_timer(1.0, enable_data_collection)
         
     def _send_x_button_to_control(self):
         """Send fake X button press to control node to trigger autonomous mode."""
