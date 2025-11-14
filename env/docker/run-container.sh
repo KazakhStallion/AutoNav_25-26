@@ -30,7 +30,6 @@ DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /run/dbus:/run/dbus")
 DOCKER_ARGS+=("-v /dev/input:/dev/input")
 DOCKER_ARGS+=("-v /run/udev:/run/udev:ro")
-DOCKER_ARGS+=( "--device-cgroup-rule=c 13:* rmw" )
 DOCKER_ARGS+=( "--network=host" )
 
 # DISPLAY FORWARDING
@@ -116,6 +115,7 @@ docker run -it \
     --gpus all \
     --privileged \
     --ipc host \
+    --device-cgroup-rule='c 13:* rmw' \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=all \
     --device /dev/bus/usb:/dev/bus/usb \
