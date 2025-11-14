@@ -27,8 +27,9 @@ DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
 DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 
 # D-BUS & BLUETOOTH
-DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus")
+DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus:z")
 DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
+DOCKER_ARGS+=("--network=host")
 
 # DISPLAY FORWARDING
 DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
@@ -112,7 +113,6 @@ docker run -it \
     --runtime nvidia \
     --gpus all \
     --privileged \
-    --network host \
     --ipc host \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=all \
