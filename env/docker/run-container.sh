@@ -31,6 +31,9 @@ DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus:z")
 DOCKER_ARGS+=("-v /run/dbus:/run/dbus")
 DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
 DOCKER_ARGS+=("--network=host")
+DOCKER_ARGS+=("-v /dev/input:/dev/input")
+DOCKER_ARGS+=("-v /run/udev:/run/udev:ro")
+DOCKER_ARGS+=(--device-cgroup-rule='c 13:* rmw')
 
 # DISPLAY FORWARDING
 DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
