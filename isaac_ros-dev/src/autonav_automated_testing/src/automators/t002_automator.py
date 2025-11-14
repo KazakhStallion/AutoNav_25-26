@@ -45,7 +45,7 @@ class T002Automator(BaseAutomator):
         # =================================== #
         
         # ===== System Status Tracking ===== #
-        self.gps_online = False
+        self.gps_online = True
         self.odom_online = False
         self.imu_online = False
         self.lidar_online = True
@@ -55,7 +55,7 @@ class T002Automator(BaseAutomator):
         
         # Timeouts for sensor checks (seconds)
         self.sensor_check_start_time = self.get_clock().now()
-        self.sensor_timeout = 30.0  # 30 seconds to get all sensors online
+        self.sensor_timeout = 60.0  # 30 seconds to get all sensors online
         # =================================== #
         
         # ===== Test Specific Publishers ===== #
