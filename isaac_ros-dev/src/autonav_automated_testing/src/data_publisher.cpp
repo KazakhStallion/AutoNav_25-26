@@ -232,7 +232,7 @@ private:
         
         // Publish GPS data
         if (!latest_gps_data_.empty()) {
-            msg.data = "/gps/fix,NavSatFix," + latest_gps_data_;
+            msg.data = "/gps_fix,NavSatFix," + latest_gps_data_;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing GPS: %s", msg.data.c_str());
