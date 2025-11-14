@@ -60,6 +60,17 @@ class BaseAutomator(Node):
         # Initialize log file with header
         self.init_log_file()
         
+        # Standardized topic -> data keys mapping used by child classes
+        self.standard_topic_keys = {
+            '/gps_fix': 'latitude,longitude,altitude',
+            '/encoders': 'encoder_left,encoder_right',
+            '/odom': 'pos_x,pos_y,orient_z',
+            '/cmd_vel': 'linear_x,angular_z',
+            '/zed/zed_node/imu/data': 'accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,orient_x,orient_y,orient_z',
+            '/scan': 'range_min,range_max,ranges_count',
+            '/line_detection/lines': 'lines_detected'
+        }
+        
         self.get_logger().info(f'{self.test_id} Automater initialized')
 
     def init_log_file(self):
@@ -178,7 +189,7 @@ class BaseAutomator(Node):
             # Format based on topic type
             formatted_rows = []
             
-            if topic_name == "/gps/fix":
+            if topic_name == "/gps_fix":
                 if len(data_values) >= 3:
                     formatted_rows.append([
                         ros_timestamp, 
@@ -206,7 +217,7 @@ class BaseAutomator(Node):
                         topic_name, 
                         "linear_x,angular_z"
                     ] + data_values[0:2])
-            elif topic_name == "/imu/data":
+            elif topic_name == "/zed/zed_node/imu/data":
                 if len(data_values) >= 9:
                     formatted_rows.append([
                         ros_timestamp, 
@@ -274,3 +285,27 @@ class BaseAutomator(Node):
                 self.get_logger().info(f'Data saved to backup file: {backup_file}')
             except Exception as backup_error:
                 self.get_logger().error(f'Failed to save backup: {backup_error}')
+    
+    def format_row(self, topic: str, values: list, keys: str = None) -> list:
+        """Return a CSV-formatted row according to standardized format.
+        topic: topic name (with or without leading '/')
+        values: list of values (will be converted to strings)
+        keys: optional comma-separated keys string; default from standard_topic_keys or generic value_N
+        """
+        if not topic.startswith('/'):
+            topic = f'/{topic}'
+        if keys is None:
+            keys = self.standard_topic_keys.get(topic)
+            if keys is None:
+                keys = ",".join([f"value_{i}" for i in range(len(values))])
+        ts = self.get_clock().now().nanoseconds
+        return [ts, topic, keys] + [str(v) for v in values]
+
+    def append_standard_row(self, topic: str, values: list, keys: str = None):
+        """Append a standardized row to collected_data if test is running."""
+        try:
+            if self.test_started and not self.test_complete:
+                row = self.format_row(topic, values, keys)
+                self.collected_data.append(row)
+        except Exception as e:
+            self.get_logger().warning(f'Failed to append standard row for {topic}: {e}')

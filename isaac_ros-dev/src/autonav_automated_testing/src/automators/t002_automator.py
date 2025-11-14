@@ -145,6 +145,7 @@ class T002Automator(BaseAutomator):
             dy = msg.pose.pose.position.y - self.start_odom_position.pose.pose.position.y
             self.odom_distance_traveled = math.sqrt(dx*dx + dy*dy)
 
+
     def calculate_gps_distance(self, start_pos: NavSatFix, current_pos: NavSatFix) -> float:
         """Calculate distance between two GPS positions using Haversine formula"""
         R = 6371000  # Earth's radius in meters
