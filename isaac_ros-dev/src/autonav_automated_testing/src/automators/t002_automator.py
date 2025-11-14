@@ -39,6 +39,22 @@ class T002Automator(BaseAutomator):
         # For Joy rising-edge detection (A button)
         self.A_BUTTON_INDEX = 0
         self.last_joy_buttons = None
+        self.waiting_for_trigger = False  # Start as False until systems ready
+        self.systems_ready = False  # Flag for pre-flight checks
+        # =================================== #
+        
+        # ===== System Status Tracking ===== #
+        self.gps_online = False
+        self.odom_online = False
+        self.imu_online = True
+        self.lidar_online = True
+        self.encoder_online = False
+        self.line_detection_online = False
+        self.joy_online = False
+        
+        # Timeouts for sensor checks (seconds)
+        self.sensor_check_start_time = self.get_clock().now()
+        self.sensor_timeout = 30.0  # 30 seconds to get all sensors online
         # =================================== #
         
         # ===== Test Specific Publishers ===== #
@@ -48,14 +64,94 @@ class T002Automator(BaseAutomator):
         # ==================================== #
 
         # ===== Test Specific Subscribers ===== #
+        from sensor_msgs.msg import Imu, LaserScan
+        from autonav_interfaces.msg import Encoders
+        
         self.gps_sub = self.create_subscription(
             NavSatFix, '/gps/fix', self.gps_callback, 10)
         self.odom_sub = self.create_subscription(
             Odometry, '/odom', self.odom_callback, 10)
-        # Listen to external /joy to start the test when X button is pressed
+        self.imu_sub = self.create_subscription(
+            Imu, '/zed/zed_node/imu/data', self.imu_callback, 10)
+        self.lidar_sub = self.create_subscription(
+            LaserScan, '/scan', self.lidar_callback, 10)
+        self.encoder_sub = self.create_subscription(
+            Encoders, '/encoders', self.encoder_callback, 10)
+        # Listen to external /joy to start the test when A button is pressed
         self.joy_sub = self.create_subscription(
             Joy, 'joy', self.joy_callback, 10)
         # ===================================== #
+        
+        # Create a timer to check system status
+        self.status_timer = self.create_timer(1.0, self.check_systems)
+        
+        self.get_logger().info('T002 Automator initialized - running system checks...')
+
+    def check_systems(self):
+        """Check if all required systems are online"""
+        if self.systems_ready:
+            return
+        
+        # Check elapsed time since start
+        elapsed = (self.get_clock().now() - self.sensor_check_start_time).nanoseconds / 1e9
+        
+        # Print status every second
+        self.get_logger().info('=== System Status Check ===')
+        self.get_logger().info(f'GPS:            {"ONLINE" if self.gps_online else "OFFLINE"}')
+        self.get_logger().info(f'Odometry:       {"ONLINE" if self.odom_online else "OFFLINE"}')
+        self.get_logger().info(f'IMU:            {"ONLINE" if self.imu_online else "OFFLINE"}')
+        self.get_logger().info(f'LiDAR:          {"ONLINE" if self.lidar_online else "OFFLINE"}')
+        self.get_logger().info(f'Encoders:       {"ONLINE" if self.encoder_online else "OFFLINE"}')
+        self.get_logger().info(f'Joystick:       {"ONLINE" if self.joy_online else "OFFLINE"}')
+        self.get_logger().info(f'Elapsed: {elapsed:.1f}s / {self.sensor_timeout}s')
+        self.get_logger().info('===========================')
+        
+        # Check if all systems are ready
+        if (self.gps_online and self.odom_online and self.imu_online and 
+            self.lidar_online and self.encoder_online and self.joy_online):
+            self.systems_ready = True
+            self.status_timer.cancel()  # Stop checking
+            self.get_logger().info('')
+            self.get_logger().info('!' * 50)
+            self.get_logger().info('!!!ALL SYSTEMS READY!!!')
+            self.get_logger().info('!' * 50)
+            self.get_logger().info('')
+            
+            # Now start waiting for trigger
+            self.waiting_for_trigger = True
+            self.waiting_timer = self.create_timer(2.0, self.print_waiting_message)
+            return
+        
+        # Check timeout
+        if elapsed > self.sensor_timeout:
+            self.get_logger().error('Sensor timeout! Not all systems came online.')
+            self.get_logger().error('Missing systems - cannot proceed with test.')
+            self.status_timer.cancel()
+            # Don't shutdown, just stop checking - operator can troubleshoot
+
+    def print_waiting_message(self):
+        """Periodically print waiting message until test starts"""
+        if self.waiting_for_trigger and not self.test_started and self.systems_ready:
+            self.get_logger().info("Awaiting test start trigger - Press 'A' button on joystick")
+
+    # Sensor callback functions to mark systems as online
+    def imu_callback(self, msg):
+        """IMU data received - mark as online"""
+        if not self.imu_online:
+            self.imu_online = True
+            self.get_logger().info('IMU came online')
+
+    def lidar_callback(self, msg):
+        """LiDAR data received - mark as online"""
+        if not self.lidar_online:
+            self.lidar_online = True
+            self.get_logger().info('LiDAR came online')
+
+    def encoder_callback(self, msg):
+        """Encoder data received - mark as online"""
+        if not self.encoder_online:
+            self.encoder_online = True
+            self.get_logger().info('Encoders came online')
 
     def test_manager(self):
         """Override base test manager to add distance checking"""
@@ -70,7 +166,6 @@ class T002Automator(BaseAutomator):
                 self.stop_test()
                 return
 
-    # ===== Everything within these lines are specific to the t002 test ===== #
     def test_actions(self):
         """
         Test-specific actions for T002 Line Compliance
@@ -80,42 +175,55 @@ class T002Automator(BaseAutomator):
         """
         self.get_logger().info('Starting line compliance test - robot will follow white lines')
         self.line_following_active = True
+        self.waiting_for_trigger = False  # Stop printing waiting message
         
-        # Do NOT command motion here; the bringup/nav stack should own motion.
-        # Enable autonomous mode on the control node via Joy A button rising edge.
-        self._toggle_autonomous_mode()
+        # Stop the waiting timer
+        if hasattr(self, 'waiting_timer'):
+            self.waiting_timer.cancel()
         
-        self.get_logger().info('Line following activated - bringup.launch.py should handle line detection and control')
-
-    def _toggle_autonomous_mode(self):
-        """Toggle control node into autonomous mode by simulating A button press on /joy."""
+        # Send a fake joystick X button press to control node to enable autonomous mode
+        self._send_x_button_to_control()
+        
+        self.get_logger().info('Line following activated - control node should now be in autonomous mode')
+        
+    def _send_x_button_to_control(self):
+        """Send fake X button press to control node to trigger autonomous mode."""
         try:
-            # Press
+            # X button is index 3 in control node
+            X_BUTTON_INDEX = 3
+            
+            # Press X button
             press = Joy()
             press.buttons = [0]*8
             press.axes = [0.0]*4
-            press.buttons[self.A_BUTTON_INDEX] = 1  # A
+            press.buttons[X_BUTTON_INDEX] = 1  # X button
             self.joy_pub.publish(press)
-            self.get_logger().info('Sent Joy A press to enable autonomous mode')
+            self.get_logger().info('Sent fake X button press to control node')
 
-            # Release shortly after to create a rising edge
+            # Release after short delay to create rising edge
             def release_once():
                 rel = Joy()
                 rel.buttons = [0]*8
                 rel.axes = [0.0]*4
                 self.joy_pub.publish(rel)
-                self.get_logger().info('Sent Joy A release')
+                self.get_logger().info('Released X button - control node should be in autonomous mode')
                 try:
                     release_timer.cancel()
                 except Exception:
                     pass
 
             release_timer = self.create_timer(0.2, release_once)
+            
         except Exception as e:
-            self.get_logger().warn(f'Failed to toggle autonomous mode: {e}')
+            self.get_logger().warn(f'Failed to send X button to control: {e}')
 
     def gps_callback(self, msg: NavSatFix):
         """Track GPS position for distance calculation"""
+        # Mark GPS as online on first valid message
+        if not self.gps_online and msg.status.status >= 0:
+            self.gps_online = True
+            self.get_logger().info('GPS came online')
+        
         if msg.status.status >= 0:  # Valid GPS fix
             self.current_gps_position = msg
             
@@ -134,6 +242,11 @@ class T002Automator(BaseAutomator):
 
     def odom_callback(self, msg: Odometry):
         """Track odometry position for distance calculation"""
+        # Mark odometry as online on first message
+        if not self.odom_online:
+            self.odom_online = True
+            self.get_logger().info('Odometry came online')
+        
         self.current_odom_position = msg
         
         if self.start_odom_position is None and self.test_started:
@@ -165,6 +278,11 @@ class T002Automator(BaseAutomator):
     def joy_callback(self, msg: Joy):
         """Start the test on an external Joy A button rising edge (buttons[0])"""
         try:
+            # Mark joystick as online on first message
+            if not self.joy_online:
+                self.joy_online = True
+                self.get_logger().info('Joystick came online')
+            
             if not hasattr(msg, 'buttons') or len(msg.buttons) <= self.A_BUTTON_INDEX:
                 # Can't detect A button, just store and exit
                 self.last_joy_buttons = list(msg.buttons) if hasattr(msg, 'buttons') else None
@@ -179,12 +297,14 @@ class T002Automator(BaseAutomator):
                 curr_val = curr_buttons[self.A_BUTTON_INDEX]
                 if curr_val == 1 and prev_val == 0:
                     # Rising edge detected on A button
-                    if not self.test_started and not self.test_complete:
+                    if not self.test_started and not self.test_complete and self.systems_ready:
                         self.get_logger().info('Joy A rising edge detected — starting test')
                         try:
                             self.start_test()
                         except Exception as e:
                             self.get_logger().warn(f'Failed to start test from Joy input: {e}')
+                    elif not self.systems_ready:
+                        self.get_logger().warn('Cannot start test - systems not ready yet!')
 
             # Save the latest buttons state for future edge detection
             self.last_joy_buttons = curr_buttons
