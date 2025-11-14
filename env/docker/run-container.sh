@@ -28,6 +28,7 @@ DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 
 # D-BUS & BLUETOOTH
 DOCKER_ARGS+=("-v /var/run/dbus:/var/run/dbus:z")
+DOCKER_ARGS+=("-v /run/dbus:/run/dbus")
 DOCKER_ARGS+=("-v /sys/class/bluetooth:/sys/class/bluetooth")
 DOCKER_ARGS+=("--network=host")
 
