@@ -24,7 +24,7 @@ class T002Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
         super().__init__('t002_automater', 't002', 'Line_Comp')
-
+        
         # ===== Test-Specific Variables ===== #
         # Distance tracking variables
         self.start_gps_position = None
@@ -36,6 +36,9 @@ class T002Automator(BaseAutomator):
         self.target_distance_ft = 110.0  # 110 feet target
         self.target_distance_m = self.target_distance_ft * 0.3048  # Convert to meters
         self.line_following_active = False
+        # For Joy rising-edge detection (A button)
+        self.A_BUTTON_INDEX = 0
+        self.last_joy_buttons = None
         # =================================== #
         
         # ===== Test Specific Publishers ===== #
@@ -49,6 +52,9 @@ class T002Automator(BaseAutomator):
             NavSatFix, '/gps/fix', self.gps_callback, 10)
         self.odom_sub = self.create_subscription(
             Odometry, '/odom', self.odom_callback, 10)
+        # Listen to external /joy to start the test when X button is pressed
+        self.joy_sub = self.create_subscription(
+            Joy, 'joy', self.joy_callback, 10)
         # ===================================== #
 
     def test_manager(self):
@@ -76,21 +82,21 @@ class T002Automator(BaseAutomator):
         self.line_following_active = True
         
         # Do NOT command motion here; the bringup/nav stack should own motion.
-        # Enable autonomous mode on the control node via Joy X button rising edge.
+        # Enable autonomous mode on the control node via Joy A button rising edge.
         self._toggle_autonomous_mode()
         
         self.get_logger().info('Line following activated - bringup.launch.py should handle line detection and control')
 
     def _toggle_autonomous_mode(self):
-        """Toggle control node into autonomous mode by simulating X button press on /joy."""
+        """Toggle control node into autonomous mode by simulating A button press on /joy."""
         try:
             # Press
             press = Joy()
             press.buttons = [0]*8
             press.axes = [0.0]*4
-            press.buttons[3] = 1  # X
+            press.buttons[self.A_BUTTON_INDEX] = 1  # A
             self.joy_pub.publish(press)
-            self.get_logger().info('Sent Joy X press to enable autonomous mode')
+            self.get_logger().info('Sent Joy A press to enable autonomous mode')
 
             # Release shortly after to create a rising edge
             def release_once():
@@ -98,7 +104,7 @@ class T002Automator(BaseAutomator):
                 rel.buttons = [0]*8
                 rel.axes = [0.0]*4
                 self.joy_pub.publish(rel)
-                self.get_logger().info('Sent Joy X release')
+                self.get_logger().info('Sent Joy A release')
                 try:
                     release_timer.cancel()
                 except Exception:
@@ -154,6 +160,35 @@ class T002Automator(BaseAutomator):
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         
         return R * c
+
+    def joy_callback(self, msg: Joy):
+        """Start the test on an external Joy A button rising edge (buttons[0])"""
+        try:
+            if not hasattr(msg, 'buttons') or len(msg.buttons) <= self.A_BUTTON_INDEX:
+                # Can't detect A button, just store and exit
+                self.last_joy_buttons = list(msg.buttons) if hasattr(msg, 'buttons') else None
+                return
+
+            curr_buttons = list(msg.buttons)
+
+            # If we have a previous sample, check for rising edge on A button index
+            if self.last_joy_buttons is not None:
+                prev = self.last_joy_buttons
+                prev_val = prev[self.A_BUTTON_INDEX] if len(prev) > self.A_BUTTON_INDEX else 0
+                curr_val = curr_buttons[self.A_BUTTON_INDEX]
+                if curr_val == 1 and prev_val == 0:
+                    # Rising edge detected on A button
+                    if not self.test_started and not self.test_complete:
+                        self.get_logger().info('Joy A rising edge detected — starting test')
+                        try:
+                            self.start_test()
+                        except Exception as e:
+                            self.get_logger().warn(f'Failed to start test from Joy input: {e}')
+
+            # Save the latest buttons state for future edge detection
+            self.last_joy_buttons = curr_buttons
+        except Exception as e:
+            self.get_logger().warn(f'Error in joy_callback: {e}')
     # ======================================================================= #
 
 def main(args=None):

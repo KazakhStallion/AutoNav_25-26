@@ -78,20 +78,7 @@ class BaseAutomator(Node):
             self.stop_test()
             return
         
-        # Countdown to test start (10 second delay)
-        if self.elapsed_time <= 10 and not self.test_started:
-            remaining_time = 10 - self.elapsed_time
-            if remaining_time > 0:
-                self.get_logger().info(f'Test starting in {remaining_time} seconds...')
-        
-        # Start test at t=10s (10 second delay for preparation)
-        if self.elapsed_time == 10 and not self.test_started:
-            self.start_test()
-        
-        # Start test-specific actions after test is started
-        if self.test_started and not self.test_actions_started and self.elapsed_time == 13:
-            self.test_actions_started = True
-            self.test_actions()
+        # Removed countdown and automatic start logic — tests are started explicitly (e.g. via Joy)
         
         # Check for test completion conditions
         if self.elapsed_time > self.timeout:
@@ -108,6 +95,21 @@ class BaseAutomator(Node):
         toggle_msg.data = True
         self.toggle_pub.publish(toggle_msg)
         self.get_logger().info('Data collection enabled')
+
+        # Schedule test-specific actions after a short delay (one-shot timer)
+        def _start_actions_once():
+            try:
+                # mark actions started and call test-specific routine
+                self.test_actions_started = True
+                self.test_actions()
+            finally:
+                # cancel this timer so it only runs once
+                try:
+                    start_actions_timer.cancel()
+                except Exception:
+                    pass
+
+        start_actions_timer = self.create_timer(3.0, _start_actions_once)
 
     def test_actions(self):
         """Test-specific actions - must be overridden in child classes"""
