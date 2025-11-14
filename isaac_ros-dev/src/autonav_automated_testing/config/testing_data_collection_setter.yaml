@@ -63,7 +63,7 @@ data_publisher:
     t001: ["/gps_fix", "/odom", "/tf", "/encoders", "/cmd_vel"]
     
     # Test 002: Line Compliance - Monitor GPS, IMU, LiDAR, and Encoders for line following
-    t002: ["/gps_fix", "/imu/data", "/scan", "/encoders", "/odom", "/cmd_vel", "/line_detection/lines"]
+    t002: ["/gps_fix", "/zed/zed_node/imu/data", "/scan", "/encoders", "/odom", "/cmd_vel", "/line_detection/lines"]
     
     # Test 003: Forward Movement
     t003: ["/odom", "/encoders", "/cmd_vel", "/camera/image_raw"]
