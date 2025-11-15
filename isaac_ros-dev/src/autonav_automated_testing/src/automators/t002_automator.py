@@ -81,6 +81,9 @@ class T002Automator(BaseAutomator):
         # Listen to external /joy to start the test when A button is pressed
         self.joy_sub = self.create_subscription(
             Joy, 'joy', self.joy_callback, 10)
+        # Subscribe to cmd_vel to log movement commands directly
+        self.cmd_vel_sub = self.create_subscription(
+            Twist, '/cmd_vel', self.cmd_vel_callback, 10)
         # ===================================== #
         
         # Create a timer to check system status

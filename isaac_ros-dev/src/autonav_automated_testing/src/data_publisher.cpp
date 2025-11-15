@@ -14,6 +14,7 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
+#include <mutex>
 
 /**
  * @brief Data Publisher Node for Automated Testing
@@ -43,6 +44,9 @@ private:
     bool collecting_data_;
     bool estop_triggered_;
     std::string test_id_;
+    
+    // Mutex to protect shared data from race conditions
+    std::mutex data_mutex_;
     
     // Latest data storage
     std::string latest_gps_data_;
@@ -170,6 +174,7 @@ private:
                 [this](const autonav_interfaces::msg::Encoders::SharedPtr msg) {
                     std::stringstream ss;
                     ss << msg->left_motor_count << "," << msg->right_motor_count;
+                    std::lock_guard<std::mutex> lock(data_mutex_);
                     latest_encoder_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
@@ -230,25 +235,38 @@ private:
         auto msg = std_msgs::msg::String();
         static int debug_count = 0;
         
+        // Make local copies of data with mutex protection to avoid race conditions
+        std::string gps_data, imu_data, scan_data, odom_data, cmd_vel_data, encoder_data, lines_data;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            gps_data = latest_gps_data_;
+            imu_data = latest_imu_data_;
+            scan_data = latest_scan_data_;
+            odom_data = latest_odom_data_;
+            cmd_vel_data = latest_cmd_vel_data_;
+            encoder_data = latest_encoder_data_;
+            lines_data = latest_lines_data_;
+        }
+        
         // Publish GPS data
-        if (!latest_gps_data_.empty()) {
-            msg.data = "/gps_fix,NavSatFix," + latest_gps_data_;
+        if (!gps_data.empty()) {
+            msg.data = "/gps_fix,NavSatFix," + gps_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing GPS: %s", msg.data.c_str());
             }
         }
         // Publish IMU data
-        if (!latest_imu_data_.empty()) {
-            msg.data = "/zed/zed_node/imu/data,Imu," + latest_imu_data_;
+        if (!imu_data.empty()) {
+            msg.data = "/zed/zed_node/imu/data,Imu," + imu_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing IMU: %s", msg.data.c_str());
             }
         }
         // Publish LaserScan data summary
-        if (!latest_scan_data_.empty()) {
-            msg.data = "/scan,LaserScan," + latest_scan_data_;
+        if (!scan_data.empty()) {
+            msg.data = "/scan,LaserScan," + scan_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing Scan: %s", msg.data.c_str());
@@ -256,8 +274,8 @@ private:
         }
         
         // Publish Odometry data
-        if (!latest_odom_data_.empty()) {
-            msg.data = "/odom,Odometry," + latest_odom_data_;
+        if (!odom_data.empty()) {
+            msg.data = "/odom,Odometry," + odom_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing Odom: %s", msg.data.c_str());
@@ -265,8 +283,8 @@ private:
         }
         
         // Publish cmd_vel data
-        if (!latest_cmd_vel_data_.empty()) {
-            msg.data = "/cmd_vel,Twist," + latest_cmd_vel_data_;
+        if (!cmd_vel_data.empty()) {
+            msg.data = "/cmd_vel,Twist," + cmd_vel_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing cmd_vel: %s", msg.data.c_str());
@@ -274,16 +292,16 @@ private:
         }
         
         // Publish encoder data
-        if (!latest_encoder_data_.empty()) {
-            msg.data = "/encoders,String," + latest_encoder_data_;
+        if (!encoder_data.empty()) {
+            msg.data = "/encoders,String," + encoder_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing encoders: %s", msg.data.c_str());
             }
         }
         // Publish line detection data if available
-        if (!latest_lines_data_.empty()) {
-            msg.data = "/line_detection/lines,String," + latest_lines_data_;
+        if (!lines_data.empty()) {
+            msg.data = "/line_detection/lines,String," + lines_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing lines: %s", msg.data.c_str());
