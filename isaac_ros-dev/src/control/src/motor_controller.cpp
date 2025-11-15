@@ -209,9 +209,11 @@ int MotorController::getLeftEncoderCount(){
   }
 
   // DEBUG: Print parsed value
-  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC PARSED: [%s]", encoderCount.c_str());    #ifdef CONTROL_DEBUG
-    RCLCPP_INFO(rclcpp::get_logger("control"), "LEC  %s", encoderCount.c_str());
-    #endif
+  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC PARSED: [%s]", encoderCount.c_str());    
+  
+  #ifdef CONTROL_DEBUG
+  RCLCPP_INFO(rclcpp::get_logger("control"), "LEC  %s", encoderCount.c_str());
+  #endif
 
 
   try {
