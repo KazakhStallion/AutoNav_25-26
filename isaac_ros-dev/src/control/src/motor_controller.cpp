@@ -168,20 +168,12 @@ int MotorController::getRightEncoderCount(){
   //RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
   bool equalSign = false;
-
-  for (int i = 0; i < 40 && readBuffer[i] != '\0' && readBuffer[i] != '\r' && readBuffer[i] != '\n'; ++i) {
-    if (!equalSign) {
-      if (readBuffer[i] == '=') {
-        equalSign = true;
-      }
-      continue;
-    }
-
-    if ((readBuffer[i] >= '0' && readBuffer[i] <= '9') || readBuffer[i] == '-') {
+  for (int i = 0; i < 40; i++) {
+    if((readBuffer[i] >= '0' && readBuffer[i] <= '9' && equalSign) || (readBuffer[i] == '-' && equalSign)){
       encoderCount += readBuffer[i];
-    } else if (!encoderCount.empty()) {
-      // stop once the number is over
-      break;
+    }
+    if (readBuffer[i] == 61){
+      equalSign = true;
     }
   }
 
@@ -225,20 +217,12 @@ int MotorController::getLeftEncoderCount(){
   //RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
   bool equalSign = false;
-
-  for (int i = 0; i < 40 && readBuffer[i] != '\0' && readBuffer[i] != '\r' && readBuffer[i] != '\n'; ++i) {
-    if (!equalSign) {
-      if (readBuffer[i] == '=') {
-        equalSign = true;
-      }
-      continue;
-    }
-
-    if ((readBuffer[i] >= '0' && readBuffer[i] <= '9') || readBuffer[i] == '-') {
+  for (int i = 0; i < 40; i++) {
+    if((readBuffer[i] >= '0' && readBuffer[i] <= '9' && equalSign) || (readBuffer[i] == '-' && equalSign)){
       encoderCount += readBuffer[i];
-    } else if (!encoderCount.empty()) {
-      // stop once the number is over
-      break;
+    }
+    if (readBuffer[i] == 61){
+      equalSign = true;
     }
   }
 
