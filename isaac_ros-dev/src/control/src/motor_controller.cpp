@@ -149,7 +149,9 @@ int MotorController::getRightEncoderCount(){
   motorSerial.writeString(command.c_str());  
   motorSerial.readString(readBuffer, '\n', 40, 10);
 
-  //std::cout << readBuffer << std::endl;
+  // DEBUG: Print raw buffer
+  std::cout << "RIGHT ENC RAW: [" << readBuffer << "]" << std::endl;
+  
   std::string encoderCount = "";
   bool equalSign = false;
   for (int i = 0; i < 40; i++) {
@@ -163,6 +165,8 @@ int MotorController::getRightEncoderCount(){
       }
   }
 
+  // DEBUG: Print parsed value
+  std::cout << "RIGHT ENC PARSED: [" << encoderCount << "]" << std::endl;
   
     #ifdef CONTROL_DEBUG
     RCLCPP_INFO(rclcpp::get_logger("control"), "REC  %s", encoderCount.c_str());
@@ -187,7 +191,10 @@ int MotorController::getLeftEncoderCount(){
   motorSerial.writeString(command.c_str());  
 
   motorSerial.readString(readBuffer, '\n', 40, 10);
-
+  
+  // DEBUG: Print raw buffer
+  std::cout << "LEFT ENC RAW: [" << readBuffer << "]" << std::endl;
+  
   std::string encoderCount = "";
   bool equalSign = false;
   for (int i = 0; i < 40; i++) {
@@ -201,6 +208,9 @@ int MotorController::getLeftEncoderCount(){
       }
   }
 
+  // DEBUG: Print parsed value
+  std::cout << "LEFT ENC PARSED: [" << encoderCount << "]" << std::endl;
+  
     #ifdef CONTROL_DEBUG
     RCLCPP_INFO(rclcpp::get_logger("control"), "LEC  %s", encoderCount.c_str());
     #endif
