@@ -1,10 +1,6 @@
 #include "motor_controller.hpp"
 #include <rclcpp/rclcpp.hpp>
 
-// Fixing the encoder reading with regex and climits
-#include <regex>
-#include <climits>
-
 // constructor
 MotorController::MotorController(){
   
@@ -148,75 +144,100 @@ int MotorController::getSpeed(){
 
 int MotorController::getRightEncoderCount(){
   std::string command = "?C 1\r";
+  char firstBuffer[41] = {};
   char readBuffer[41] = {};
   motorSerial.writeString(command.c_str());
-  motorSerial.readString(readBuffer, '\n', 40, 10);
 
-  // DEBUG: Print raw buffer
-  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENC RAW: [%s]", readBuffer);
+  motorSerial.readString(firstBuffer, '\n', 40, 10);
 
-  // Convert to string and, if we see echo of the command, try one quick extra read
-  std::string s(readBuffer);
-  if (s.find("?C") != std::string::npos || s.find("!G") != std::string::npos || s.find("!C") != std::string::npos) {
-    char readBuffer2[41] = {};
-    motorSerial.readString(readBuffer2, '\n', 40, 10);
-    RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENC EXTRA RAW: [%s]", readBuffer2);
-    s = std::string(readBuffer2);
+  bool isEcho = false;
+  bool isData = false;
+  for (int i = 0; i < 40 && firstBuffer[i] != '\0'; i++) {
+    if (firstBuffer[i] == '?') isEcho = true;
+    if (firstBuffer[i] == '=') isData = true;
   }
 
-  // Extract first signed integer robustly
-  std::smatch m;
-  std::regex re(R"((-?\d+))");
-  if (std::regex_search(s, m, re)) {
-    try {
-      long long valLL = std::stoll(m.str(1));
-      // clamp to 32-bit signed range before storing/returning
-      int val = (valLL > INT_MAX) ? INT_MAX : (valLL < INT_MIN) ? INT_MIN : static_cast<int>(valLL);
-      prevRightEncoderCount = val;
-      RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENC PARSED: [%d]", val);
-      return val;
-    } catch (...) {
-      // fall through to return previous
-    }
+  if (isData) {
+    strcpy(readBuffer, firstBuffer);
+  } else if (isEcho) {
+    motorSerial.readString(readBuffer, '\n', 40, 10);
+  } else {
+    strcpy(readBuffer, firstBuffer);
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENC PARSED: [%d] (fallback)", prevRightEncoderCount);
-  return prevRightEncoderCount;
+  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER RAW: %s", readBuffer);
+  std::string encoderCount = "";
+  bool equalSign = false;
+  for (int i = 0; i < 40; i++) {
+      if ((readBuffer[i] >= '0' && readBuffer[i] <= '9' && equalSign) || (readBuffer[i] == '-' && equalSign)) {
+        encoderCount += readBuffer[i];
+      }
+      if (readBuffer[i] == 61) {
+        equalSign = true;
+      }
+  }
+
+  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER PARSED: %s", encoderCount.c_str());
+  #ifdef CONTROL_DEBUG
+    RCLCPP_INFO(rclcpp::get_logger("control"), "Rec %s", encoderCount.c_str());
+  #endif
+
+  try {
+    temp = std::stoi(encoderCount);
+    prevRightEncoderCount = temp;
+    return std::stoi(encoderCount);
+  } catch (...) {
+    return prevRightEncoderCount;
+  }
 }
 
 int MotorController::getLeftEncoderCount(){
   std::string command = "?C 2\r";
+  char firstBuffer[41] = {};
   char readBuffer[41] = {};
   motorSerial.writeString(command.c_str());
-  motorSerial.readString(readBuffer, '\n', 40, 10);
 
-  // DEBUG: Print raw buffer
-  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC RAW: [%s]", readBuffer);
+  motorSerial.readString(firstBuffer, '\n', 40, 10);
 
-  std::string s(readBuffer);
-  if (s.find("?C") != std::string::npos || s.find("!G") != std::string::npos || s.find("!C") != std::string::npos) {
-    char readBuffer2[41] = {};
-    motorSerial.readString(readBuffer2, '\n', 40, 10);
-    RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC EXTRA RAW: [%s]", readBuffer2);
-    s = std::string(readBuffer2);
+  bool isEcho = false;
+  bool isData = false;
+  for (int i = 0; i < 40 && firstBuffer[i] != '\0'; i++) {
+    if (firstBuffer[i] == '?') isEcho = true;
+    if (firstBuffer[i] == '=') isData = true;
   }
 
-  std::smatch m;
-  std::regex re(R"((-?\d+))");
-  if (std::regex_search(s, m, re)) {
-    try {
-      long long valLL = std::stoll(m.str(1));
-      int val = (valLL > INT_MAX) ? INT_MAX : (valLL < INT_MIN) ? INT_MIN : static_cast<int>(valLL);
-      prevLeftEncoderCount = val;
-      RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC PARSED: [%d]", val);
-      return val;
-    } catch (...) {
-      // fall through
-    }
+  if (isData) {
+    strcpy(readBuffer, firstBuffer);
+  } else if (isEcho) {
+    motorSerial.readString(readBuffer, '\n', 40, 10);
+  } else {
+    strcpy(readBuffer, firstBuffer);
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENC PARSED: [%d] (fallback)", prevLeftEncoderCount);
-  return prevLeftEncoderCount;
+  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER RAW: %s", readBuffer);
+  std::string encoderCount = "";
+  bool equalSign = false;
+  for (int i = 0; i < 40; i++) {
+      if ((readBuffer[i] >= '0' && readBuffer[i] <= '9' && equalSign) || (readBuffer[i] == '-' && equalSign)) {
+        encoderCount += readBuffer[i];
+      }
+      if (readBuffer[i] == 61) {
+        equalSign = true;
+      }
+  }
+
+  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER PARSED: %s", encoderCount.c_str());
+  #ifdef CONTROL_DEBUG
+    RCLCPP_INFO(rclcpp::get_logger("control"), "REC %s", encoderCount.c_str());
+  #endif
+
+  try {
+    temp = std::stoi(encoderCount);
+    prevLeftEncoderCount = temp;
+    return std::stoi(encoderCount);
+  } catch (...) {
+    return prevLeftEncoderCount;
+  }
 }
 
 int MotorController::getRightRPM(){
