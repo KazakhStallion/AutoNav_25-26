@@ -144,26 +144,9 @@ int MotorController::getSpeed(){
 
 int MotorController::getRightEncoderCount(){
   std::string command = "?C 1\r";
-  char firstBuffer[41] = {};
   char readBuffer[41] = {};
   motorSerial.writeString(command.c_str());
-
-  motorSerial.readString(firstBuffer, '\n', 40, 10);
-
-  bool isEcho = false;
-  bool isData = false;
-  for (int i = 0; i < 40 && firstBuffer[i] != '\0'; i++) {
-    if (firstBuffer[i] == '?') isEcho = true;
-    if (firstBuffer[i] == '=') isData = true;
-  }
-
-  if (isData) {
-    strcpy(readBuffer, firstBuffer);
-  } else if (isEcho) {
-    motorSerial.readString(readBuffer, '\n', 40, 10);
-  } else {
-    strcpy(readBuffer, firstBuffer);
-  }
+  motorSerial.readString(readBuffer, '\n', 40, 10);
 
   //RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
@@ -193,27 +176,10 @@ int MotorController::getRightEncoderCount(){
 
 int MotorController::getLeftEncoderCount(){
   std::string command = "?C 2\r";
-  char firstBuffer[41] = {};
   char readBuffer[41] = {};
   motorSerial.writeString(command.c_str());
-
-  motorSerial.readString(firstBuffer, '\n', 40, 10);
-
-  bool isEcho = false;
-  bool isData = false;
-  for (int i = 0; i < 40 && firstBuffer[i] != '\0'; i++) {
-    if (firstBuffer[i] == '?') isEcho = true;
-    if (firstBuffer[i] == '=') isData = true;
-  }
-
-  if (isData) {
-    strcpy(readBuffer, firstBuffer);
-  } else if (isEcho) {
-    motorSerial.readString(readBuffer, '\n', 40, 10);
-  } else {
-    strcpy(readBuffer, firstBuffer);
-  }
-
+  motorSerial.readString(readBuffer, '\n', 40, 10);
+    
   //RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
   bool equalSign = false;
