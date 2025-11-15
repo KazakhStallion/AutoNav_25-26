@@ -165,7 +165,7 @@ int MotorController::getRightEncoderCount(){
     strcpy(readBuffer, firstBuffer);
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER RAW: %s", readBuffer);
+  //RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
   bool equalSign = false;
 
@@ -185,7 +185,7 @@ int MotorController::getRightEncoderCount(){
     }
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER PARSED: %s", encoderCount.c_str());
+  //RCLCPP_INFO(rclcpp::get_logger("control"), "RIGHT ENCODER PARSED: %s", encoderCount.c_str());
   #ifdef CONTROL_DEBUG
     RCLCPP_INFO(rclcpp::get_logger("control"), "Rec %s", encoderCount.c_str());
   #endif
@@ -222,7 +222,7 @@ int MotorController::getLeftEncoderCount(){
     strcpy(readBuffer, firstBuffer);
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER RAW: %s", readBuffer);
+  //RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER RAW: %s", readBuffer);
   std::string encoderCount = "";
   bool equalSign = false;
 
@@ -242,7 +242,7 @@ int MotorController::getLeftEncoderCount(){
     }
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER PARSED: %s", encoderCount.c_str());
+  //RCLCPP_INFO(rclcpp::get_logger("control"), "LEFT ENCODER PARSED: %s", encoderCount.c_str());
   #ifdef CONTROL_DEBUG
     RCLCPP_INFO(rclcpp::get_logger("control"), "REC %s", encoderCount.c_str());
   #endif
