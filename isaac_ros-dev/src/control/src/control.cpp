@@ -38,7 +38,23 @@ class ControlNode : public rclcpp::Node {
         configure_server = this->create_service<autonav_interfaces::srv::ConfigureControl>
              ("configure_control", std::bind(&ControlNode::configure, this, std::placeholders::_1, std::placeholders::_2));
 
+        // Declare parameter listing topics to guard [!]
+        this->declare_parameter<std::vector<std::string>>(
+            "guard_topics", std::vector<std::string>{"/encoders"}
+        );
 
+        this->get_parameter("guard_topics", guard_topics_);
+
+        // Normalize names (ensure they start with '/')
+        for (auto & t : guard_topics_) {
+            if (!t.empty() && t.front() != '/') {
+            t = "/" + t;
+            }
+        }
+
+        // Rate to check for multiple publishers
+        using namespace std::chrono_literals;
+        pub_guard_timer_ = this->create_wall_timer(500ms, std::bind(&ControlNode::check_duplicate_publishers, this));
     }
 
     serialib arduinoSerial;
@@ -52,6 +68,10 @@ class ControlNode : public rclcpp::Node {
     float angular_move;
     float left_wheel_speed;
     float right_wheel_speed;
+
+    // Variables for duplicate publisher guard
+    rclcpp::TimerBase::SharedPtr pub_guard_timer_;
+    std::vector<std::string> guard_topics_;
 
     // subscription for joystick
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr controllerSub;
@@ -295,6 +315,42 @@ class ControlNode : public rclcpp::Node {
 
     }
 
+    void check_duplicate_publishers()
+    {
+        // Run once then stop the timer
+        pub_guard_timer_->cancel();
+
+        const std::string node_name = this->get_name();
+        const std::string node_ns   = this->get_namespace();
+
+        for (const auto & topic : guard_topics_) {
+            auto infos = this->get_publishers_info_by_topic(topic, false);
+
+            // Count publishers from THIS node
+            std::size_t count = 0;
+            for (const auto & info : infos) {
+            if (info.node_name() == node_name &&
+                info.node_namespace() == node_ns) {
+                ++count;
+            }
+            }
+
+            if (count > 1) {
+            RCLCPP_FATAL(
+                this->get_logger(),
+                "Duplicate publishers detected on topic '%s' from node '%s'. "
+                "Expected 1, found %zu. Shutting down to prevent data corruption.",
+                topic.c_str(), node_name.c_str(), count);
+            rclcpp::shutdown();
+            return;
+            }
+
+            RCLCPP_INFO(
+            this->get_logger(),
+            "OK: %zu publisher(s) from this node on topic '%s'.",
+            count, topic.c_str());
+        }
+    }
 };
 
 
