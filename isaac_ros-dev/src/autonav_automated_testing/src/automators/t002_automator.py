@@ -47,7 +47,7 @@ class T002Automator(BaseAutomator):
         # ===== System Status Tracking ===== #
         self.gps_online = True
         self.odom_online = False
-        self.imu_online = False
+        self.imu_online = True
         self.lidar_online = True
         self.encoder_online = False
         self.line_detection_online = False
