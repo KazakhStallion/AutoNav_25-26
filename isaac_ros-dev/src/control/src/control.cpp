@@ -30,7 +30,7 @@ class ControlNode : public rclcpp::Node {
         this->declare_parameter("encoder_topic", "encoders");
         this->declare_parameter("path_planning_topic", "cmd_vel");
 
-        // serial ports
+        // serial ports test
         this->declare_parameter("motor_port", "/dev/ttyACM0");
         this->declare_parameter("arduino_port", "/dev/ttyACM2");
         this->declare_parameter("estop_port", "/dev/ttyTHS1");
