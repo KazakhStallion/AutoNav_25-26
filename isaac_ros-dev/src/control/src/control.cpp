@@ -191,16 +191,18 @@ class ControlNode : public rclcpp::Node {
             Xbox::CommandData command = controller.calculateCommand();
 
             if(command.cmd == Xbox::MOVE){
-                motors.move(command.right_motor_speed * motors.getSpeed(), command.left_motor_speed * motors.getSpeed());
+                // Joystick values are -1 to 1, multiply by current speed in MPH
+                float right_mph = command.right_motor_speed * motors.getSpeedMPH();
+                float left_mph = command.left_motor_speed * motors.getSpeedMPH();
+                motors.move(right_mph, left_mph);
             }
             else if(command.cmd == Xbox::SPEED_DOWN){
-                motors.setSpeed(motors.getSpeed() - 5);
-                RCLCPP_INFO(this->get_logger(), "speed down. new speed: %d", motors.getSpeed());
-
+                motors.decreaseSpeed();
+                RCLCPP_INFO(this->get_logger(), "Speed down. New speed: %.2f MPH", motors.getSpeedMPH());
             }
             else if(command.cmd == Xbox::SPEED_UP){
-                motors.setSpeed(motors.getSpeed() + 5);
-                RCLCPP_INFO(this->get_logger(), "speed up! new speed: %d", motors.getSpeed());
+                motors.increaseSpeed();
+                RCLCPP_INFO(this->get_logger(), "Speed up! New speed: %.2f MPH", motors.getSpeedMPH());
             }
             else if(command.cmd == Xbox::STOP){
                 motors.shutdown();

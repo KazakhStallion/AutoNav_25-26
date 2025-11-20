@@ -8,10 +8,10 @@
 
 class MotorController {
 private:
-    int stepSize = 10;
+    float speed_mph = 3.5;  // Default speed in MPH (3-4 MPH for competition)
+    float speed_increment = 0.01;  // MPH increment when pressing bumpers
     std::pair<int, int> right_turn_speeds = {-10, -10};
     std::pair<int, int> left_turn_speeds = {10, 10};
-    int speed = 11;
     std::string comPort;
     int prevLeftEncoderCount = 0;
     int prevRightEncoderCount = 0;
@@ -35,10 +35,10 @@ public:
     void shutdown();
 
     // Get and set
-    void setStepSize(int size);
-    int getStepSize();
-    void setSpeed(int s);
-    int getSpeed();
+    void setSpeedMPH(float mph);  // Set desired speed in MPH
+    float getSpeedMPH();  // Get current speed in MPH
+    void increaseSpeed();  // Increase by 0.1 MPH
+    void decreaseSpeed();  // Decrease by 0.1 MPH
     int  getLeftEncoderCount();
     int getRightEncoderCount();
     int getLeftRPM();

@@ -27,13 +27,14 @@ char MotorController::configure(const char * port){
 
 // moves the robot forward
 void MotorController::forward(){
-  if (speed < 0){
+  if (speed_mph < 0){
     return;
   }
   else{
-    float calibratedSpeed = speedConverter(speed);
-    int leftMotorSpeed = -1 * (int)(stepSize * calibratedSpeed);
-    int rightMotorSpeed = (int)(stepSize * calibratedSpeed);
+    // Convert MPH to motor CMD using calibrated speedConverter
+    int motorCmd = (int)speedConverter(speed_mph);
+    int leftMotorSpeed = -1 * motorCmd;
+    int rightMotorSpeed = motorCmd;
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -45,13 +46,14 @@ void MotorController::forward(){
 
 // moves the robot in backwards
 void MotorController::backward(){
-  if (speed < 0){
+  if (speed_mph < 0){
     return;
   }
   else{
-    float calibratedSpeed = speedConverter(speed);
-    int leftMotorSpeed = -1 * (int)(stepSize * calibratedSpeed);
-    int rightMotorSpeed = (int)(stepSize * calibratedSpeed);
+    // Convert MPH to motor CMD using calibrated speedConverter
+    int motorCmd = (int)speedConverter(speed_mph);
+    int leftMotorSpeed = motorCmd;  // Reversed for backward
+    int rightMotorSpeed = -1 * motorCmd;
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -63,14 +65,15 @@ void MotorController::backward(){
 
 // moves the robot left
 void MotorController::turnLeft(){
-  if (speed < 0){
+  if (speed_mph < 0){
     return;
   }
   else{
-    float calibratedLeftSpeed = speedConverter(left_turn_speeds.first);
-    float calibratedRightSpeed = speedConverter(left_turn_speeds.second);
-    int leftMotorSpeed = (int)(stepSize * calibratedLeftSpeed);
-    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
+    // For turning, use a fraction of the forward speed
+    float turn_speed_mph = speed_mph * 0.5;  // 50% of forward speed for turns
+    int motorCmd = (int)speedConverter(turn_speed_mph);
+    int leftMotorSpeed = motorCmd;
+    int rightMotorSpeed = motorCmd;
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -82,14 +85,15 @@ void MotorController::turnLeft(){
 
 // moves the robot right
 void MotorController::turnRight(){
-  if (speed < 0){
+  if (speed_mph < 0){
     return;
   }
   else{
-    float calibratedLeftSpeed = speedConverter(right_turn_speeds.first);
-    float calibratedRightSpeed = speedConverter(right_turn_speeds.second);
-    int leftMotorSpeed = (int)(stepSize * calibratedLeftSpeed);
-    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
+    // For turning, use a fraction of the forward speed
+    float turn_speed_mph = speed_mph * 0.5;  // 50% of forward speed for turns
+    int motorCmd = (int)speedConverter(turn_speed_mph);
+    int leftMotorSpeed = -1 * motorCmd;
+    int rightMotorSpeed = -1 * motorCmd;
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -99,13 +103,14 @@ void MotorController::turnRight(){
   }
 }
 
-// moves the robot at specific motor speeds
-void MotorController::move(float right_speed, float left_speed){
-  
-    float calibratedLeftSpeed = speedConverter(left_speed);
-    float calibratedRightSpeed = speedConverter(right_speed);
-    int leftMotorSpeed = (int)(-stepSize * calibratedLeftSpeed);
-    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
+// moves the robot at specific motor speeds (input in MPH)
+void MotorController::move(float right_speed_mph, float left_speed_mph){
+    // Convert each wheel's MPH to motor CMD using calibrated speedConverter
+    int leftMotorCmd = (int)speedConverter(left_speed_mph);
+    int rightMotorCmd = (int)speedConverter(right_speed_mph);
+    
+    int leftMotorSpeed = -leftMotorCmd;
+    int rightMotorSpeed = rightMotorCmd;
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -141,24 +146,32 @@ void MotorController::shutdown(){
   motorSerial.closeDevice();
 }
 
-// updates the step size
-void MotorController::setStepSize(int size){
-  stepSize = size;
+// updates the desired speed in MPH
+void MotorController::setSpeedMPH(float mph){
+  speed_mph = mph;
 }
 
-// gets the step size
-int MotorController::getStepSize(){
-  return stepSize;
+// gets the current speed in MPH
+float MotorController::getSpeedMPH(){
+  return speed_mph;
 }
 
-// updates the speed
-void MotorController::setSpeed(int s){
-  speed = s;
+// increases speed by the increment size
+void MotorController::increaseSpeed(){
+  speed_mph += speed_increment;
+  // Cap at max speed of 5 MPH
+  if (speed_mph > 5.0) {
+    speed_mph = 5.0;
+  }
 }
 
-// gets the speed
-int MotorController::getSpeed(){
-  return speed;
+// decreases speed by the increment size
+void MotorController::decreaseSpeed(){
+  speed_mph -= speed_increment;
+  // Don't go below 0
+  if (speed_mph < 0.0) {
+    speed_mph = 0.0;
+  }
 }
 
 // Speed calibration function:
