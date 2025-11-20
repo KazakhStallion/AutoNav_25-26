@@ -37,8 +37,8 @@ public:
     // Get and set
     void setSpeedMPH(float mph);  // Set desired speed in MPH
     float getSpeedMPH();  // Get current speed in MPH
-    void increaseSpeed();  // Increase by 0.1 MPH
-    void decreaseSpeed();  // Decrease by 0.1 MPH
+    void increaseSpeed();
+    void decreaseSpeed();
     int  getLeftEncoderCount();
     int getRightEncoderCount();
     int getLeftRPM();
