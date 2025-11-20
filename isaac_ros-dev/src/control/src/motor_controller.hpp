@@ -30,6 +30,7 @@ public:
     void turnLeft();
     void turnRight();
     void move(float right_speed, float left_speed);
+    void moveRaw(int right_cmd, int left_cmd);  // Bypass speed calibration
     void stop();
     void shutdown();
 

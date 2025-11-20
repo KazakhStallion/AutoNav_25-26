@@ -66,6 +66,8 @@ class BaseAutomator(Node):
             '/encoders': 'encoder_left,encoder_right',
             '/odom': 'pos_x,pos_y,orient_z',
             '/cmd_vel': 'linear_x,angular_z',
+            '/motor/cmd_value': 'cmd_value',
+            '/motor/linear_velocity': 'velocity_mph',
             '/zed/zed_node/imu/data': 'accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,orient_x,orient_y,orient_z',
             '/scan': 'range_min,range_max,ranges_count',
             '/line_detection/lines': 'lines_detected'
@@ -239,6 +241,22 @@ class BaseAutomator(Node):
                         ros_timestamp, 
                         topic_name, 
                         "lines_detected"
+                    ] + data_values[0:1])
+            elif topic_name == "/motor/cmd_value":
+                # Raw motor command value (for calibration)
+                if len(data_values) >= 1:
+                    formatted_rows.append([
+                        ros_timestamp, 
+                        topic_name, 
+                        "cmd_value"
+                    ] + data_values[0:1])
+            elif topic_name == "/motor/linear_velocity":
+                # Linear velocity calculated from encoders (MPH)
+                if len(data_values) >= 1:
+                    formatted_rows.append([
+                        ros_timestamp, 
+                        topic_name, 
+                        "velocity_mph"
                     ] + data_values[0:1])
             else:
                 # Generic format for unknown topics

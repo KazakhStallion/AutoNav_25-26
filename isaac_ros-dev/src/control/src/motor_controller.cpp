@@ -31,8 +31,9 @@ void MotorController::forward(){
     return;
   }
   else{
-    int leftMotorSpeed = -1 * (int)(stepSize * speed);
-    int rightMotorSpeed = (int)(stepSize * speed);
+    float calibratedSpeed = speedConverter(speed);
+    int leftMotorSpeed = -1 * (int)(stepSize * calibratedSpeed);
+    int rightMotorSpeed = (int)(stepSize * calibratedSpeed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -48,8 +49,9 @@ void MotorController::backward(){
     return;
   }
   else{
-    int leftMotorSpeed = -1 * (int)(stepSize * speed);
-    int rightMotorSpeed = (int)(stepSize * speed);
+    float calibratedSpeed = speedConverter(speed);
+    int leftMotorSpeed = -1 * (int)(stepSize * calibratedSpeed);
+    int rightMotorSpeed = (int)(stepSize * calibratedSpeed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -65,8 +67,10 @@ void MotorController::turnLeft(){
     return;
   }
   else{
-    int leftMotorSpeed = (int)(stepSize * left_turn_speeds.first);
-    int rightMotorSpeed = (int)(stepSize * left_turn_speeds.second);
+    float calibratedLeftSpeed = speedConverter(left_turn_speeds.first);
+    float calibratedRightSpeed = speedConverter(left_turn_speeds.second);
+    int leftMotorSpeed = (int)(stepSize * calibratedLeftSpeed);
+    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -82,8 +86,10 @@ void MotorController::turnRight(){
     return;
   }
   else{
-    int leftMotorSpeed = (int)(stepSize * right_turn_speeds.first);
-    int rightMotorSpeed = (int)(stepSize * right_turn_speeds.second);
+    float calibratedLeftSpeed = speedConverter(right_turn_speeds.first);
+    float calibratedRightSpeed = speedConverter(right_turn_speeds.second);
+    int leftMotorSpeed = (int)(stepSize * calibratedLeftSpeed);
+    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
@@ -96,11 +102,24 @@ void MotorController::turnRight(){
 // moves the robot at specific motor speeds
 void MotorController::move(float right_speed, float left_speed){
   
-    int leftMotorSpeed = (int)(-stepSize * left_speed);
-    int rightMotorSpeed = (int)(stepSize * right_speed);
+    float calibratedLeftSpeed = speedConverter(left_speed);
+    float calibratedRightSpeed = speedConverter(right_speed);
+    int leftMotorSpeed = (int)(-stepSize * calibratedLeftSpeed);
+    int rightMotorSpeed = (int)(stepSize * calibratedRightSpeed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
+
+    motorSerial.writeString(leftMotorCommand.c_str());
+    motorSerial.writeString(rightMotorCommand.c_str());
+}
+
+// moves the robot with raw CMD values (bypasses speed calibration)
+void MotorController::moveRaw(int right_cmd, int left_cmd){
+    // Send raw CMD values directly to motors without speed conversion
+    // Used for calibration tests (t007) to collect empirical speed data
+    std::string leftMotorCommand = "!G 1 " + std::to_string(-left_cmd) + "\r";
+    std::string rightMotorCommand = "!G 2 " + std::to_string(right_cmd) + "\r";
 
     motorSerial.writeString(leftMotorCommand.c_str());
     motorSerial.writeString(rightMotorCommand.c_str());
@@ -142,6 +161,25 @@ int MotorController::getSpeed(){
   return speed;
 }
 
+// Speed calibration function:
+float speedConverter(float speed_CONTROL){
+  // Purpose of this function:
+  // Provide conversion from,
+  // speedCONTROL [mph] -> ConvertedSpeedCMD [-]
+  // that is backed by empirical results.
+
+  // Setup constants for empirical speed conversion:
+  // cmd = A0*v^2 + A1*v + A2
+  float A0 = 0;
+  float A1 = 1;
+  float A2 = 0;
+
+  float Kcal = 1;
+
+  float v = speed_CONTROL * Kcal;
+  float converted_speed_CMD = A0 * v * v + A1 * v + A2;
+  return converted_speed_CMD;
+}
 
 int MotorController::getRightEncoderCount(){
   std::string command = "?C 1\r";

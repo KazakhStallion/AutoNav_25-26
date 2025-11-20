@@ -37,6 +37,8 @@ data_publisher:
     # /joy                           - Joystick input (sensor_msgs/Joy) - controller buttons/axes
     # /estop                         - Emergency stop status (std_msgs/String)
     # /autonomous_mode               - Autonomous mode toggle (std_msgs/Bool)
+    # /motor/cmd_value               - Raw motor command (std_msgs/Int32) - bypasses speed calibration
+    # /motor/linear_velocity         - Linear velocity from encoders (std_msgs/String) - MPH
     #
     # --- LINE DETECTION ---
     # /line_detection/lines          - Detected lines (custom message type)
@@ -77,8 +79,8 @@ data_publisher:
     # Test 006: Simulation
     t006: ["/odom", "/scan", "/tf", "/global_costmap/costmap", "/local_costmap/costmap"]
     
-    # Test 007: Speed
-    t007: ["/encoders", "/odom", "/cmd_vel"]
+    # Test 007: Speed Calibration
+    t007: ["/motor/linear_velocity", "/motor/cmd_value"]
     
     # Test 008: Acceleration
     t008: ["/encoders", "/odom", "/cmd_vel"]

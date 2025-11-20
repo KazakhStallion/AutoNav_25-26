@@ -1,51 +1,79 @@
 #!/usr/bin/env python3
 """
-t002_automator.py - Line Compliance Test Automator (Standardized Version)
+t007_automator.py - Speed Calibration Test Automator
 
-This script implements the line compliance test with the new standardized CSV format:
-- ROS2_Clock: ROS2 timestamp when data was received
-- Topic_Name: The ROS2 topic the data came from  
-- Data_Keys: Comma-separated list of data field names
-- Data_Values: The actual data values (split into multiple columns)
+This script implements a speed calibration test to generate empirical data for the
+speedConverter() function in motor_controller.cpp. It incrementally increases motor 
+CMD values from 0 to 1000 while recording actual robot speed calculated from encoder data.
 
-TEST: Robot follows white lines for 110 feet while monitoring sensors
+IMPORTANT: This test requires the control node to subscribe to /motor/raw_cmd (Int32) topic
+and directly apply the CMD value to motors WITHOUT going through speedConverter().
+
+The control node should:
+1. Subscribe to /motor/raw_cmd (std_msgs/Int32)
+2. When received, call: motors.move(cmd_value, cmd_value) bypassing speedConverter
+3. This allows us to collect raw CMD-to-speed data for calibration
+
+CSV Output (Standard Format from base_automator):
+- ROS2_Clock: ROS2 timestamp
+- Topic_Name: /motor/linear_velocity or /motor/cmd_value
+- Data_Keys: velocity_mph or cmd_value
+- Value_0+: Corresponding data values
+
+TEST FLOW:
+1. Wait for velocity topic and joystick to come online
+2. Press A button to start test
+3. Slowly ramp CMD from 0 to 1000 (increment by 5 every 100ms)
+4. Calculate speed from encoder changes  
+5. Stop when speed reaches 6 MPH consistently (10 samples) or CMD reaches 1000
+6. Save CSV data for analysis
+
+USAGE:
+After collecting data, use the CSV to fit coefficients A0, A1, A2 in:
+  converted_speed_CMD = A0 * v * v + A1 * v + A2
+Where v = desired_speed_mph * Kcal
 """
 
 import rclpy
 from base_automator import BaseAutomator
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Joy
-from std_msgs.msg import Bool
-import math
+from std_msgs.msg import Bool, Int32
 import csv
 
 class T007Automator(BaseAutomator):
     def __init__(self):
         # Initialize base class with test-specific info
-        super().__init__('t002_automater', 't007', 'Line_Comp')
+        super().__init__('t007_automator', 't007', 'Speed_Calibration')
         
         # ===== Test-Specific Variables ===== #
-        # Distance tracking variables
-        self.start_gps_position = None
-        self.current_gps_position = None
-        self.start_odom_position = None
-        self.current_odom_position = None
-        self.gps_distance_traveled = 0.0
-        self.odom_distance_traveled = 0.0
-        self.target_distance_ft = 110.0  # 110 feet target
-        self.target_distance_m = self.target_distance_ft * 0.3048  # Convert to meters
-        self.line_following_active = False
+        # Speed calibration variables
+        self.current_cmd_value = 0  # Start at 0
+        self.max_cmd_value = 1000  # Maximum motor command value
+        self.cmd_increment = 5  # Increment by 5 per update (very smooth)
+        self.target_speed_mph = 6.0  # Stop when we reach 6 MPH
+        self.speed_stable_count = 0  # Count how many times we're at/above target speed
+        self.speed_stable_threshold = 10  # Need 10 consecutive samples above 6 MPH
+        
+        # Track latest velocity data
+        self.current_speed_mph = 0.0
+        self.latest_velocity_received = False
+        
+        # Track latest CMD value from topic (not just what we publish)
+        self.latest_cmd_from_topic = 0
+        self.cmd_value_online = False
+        
         # For Joy rising-edge detection (A button)
         self.A_BUTTON_INDEX = 0
         self.last_joy_buttons = None
-        self.waiting_for_trigger = False  # Start as False until systems ready
-        self.systems_ready = False  # Flag for pre-flight checks
+        self.waiting_for_trigger = False
+        self.systems_ready = False
         # =================================== #
         
         # ===== System Status Tracking ===== #
-        self.encoder_online = False
+        self.joy_online = False
+        self.velocity_online = False
+        self.cmd_value_online = False
         
         # Timeouts for sensor checks (seconds)
         self.sensor_check_start_time = self.get_clock().now()
@@ -54,25 +82,32 @@ class T007Automator(BaseAutomator):
         
         # ===== Test Specific Publishers ===== #
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.motor_cmd_pub = self.create_publisher(Int32, '/motor/cmd_value', 10)
         # ==================================== #
 
         # ===== Test Specific Subscribers ===== #
-        from autonav_interfaces.msg import Encoders
-        self.encoder_sub = self.create_subscription(
-            Encoders, '/encoders', self.encoder_callback, 10)
-        # ===================================== #
-
-        # Need to be able to publish to Joy for A button to start test
-        self.joy_pub = self.create_publisher(Joy, 'joy', 10)
-
+        from std_msgs.msg import String
+        
+        self.velocity_sub = self.create_subscription(
+            String, '/motor/linear_velocity', self.velocity_callback, 10)
+        
+        # Subscribe to /motor/cmd_value to get the actual published CMD values
+        # This ensures we pair velocity with the CMD value at the same timestamp
+        self.cmd_value_sub = self.create_subscription(
+            Int32, '/motor/cmd_value', self.cmd_value_callback, 10)
+        
         # Listen to external /joy to start the test when A button is pressed
         self.joy_sub = self.create_subscription(
             Joy, 'joy', self.joy_callback, 10)
-        
+        # ===================================== #
+
         # Create a timer to check system status
         self.status_timer = self.create_timer(1.0, self.check_systems)
         
-        self.get_logger().info('T007 Automator initialized - running system checks...')
+        # Create timer for slow CMD ramping (update every 100ms)
+        self.cmd_ramp_timer = None
+        
+        self.get_logger().info('T007 Speed Calibration Automator initialized - running system checks...')
 
     def check_systems(self):
         """Check if all required systems are online"""
@@ -84,11 +119,14 @@ class T007Automator(BaseAutomator):
         
         # Print status every second
         self.get_logger().info('=== System Status Check ===')
-        self.get_logger().info(f'Encoders:       {"ONLINE" if self.encoder_online else "OFFLINE"}')
+        self.get_logger().info(f'Velocity:       {"ONLINE" if self.velocity_online else "OFFLINE"}')
+        self.get_logger().info(f'CMD Value:      {"ONLINE" if self.cmd_value_online else "OFFLINE"}')
+        self.get_logger().info(f'Joystick:       {"ONLINE" if self.joy_online else "OFFLINE"}')
+        self.get_logger().info(f'Elapsed: {elapsed:.1f}s / {self.sensor_timeout}s')
         self.get_logger().info('===========================')
         
         # Check if all systems are ready
-        if (self.encoder_online):
+        if self.velocity_online and self.cmd_value_online and self.joy_online:
             self.systems_ready = True
             self.status_timer.cancel()  # Stop checking
             self.get_logger().info('')
@@ -107,7 +145,6 @@ class T007Automator(BaseAutomator):
             self.get_logger().error('Sensor timeout! Not all systems came online.')
             self.get_logger().error('Missing systems - cannot proceed with test.')
             self.status_timer.cancel()
-            # Don't shutdown, just stop checking - operator can troubleshoot
 
     def print_waiting_message(self):
         """Periodically print waiting message until test starts"""
@@ -115,41 +152,103 @@ class T007Automator(BaseAutomator):
             self.get_logger().info("Awaiting test start trigger - Press 'A' button on joystick")
 
     # ===== Test Specific Callbacks ===== #
-    # Sensor callback functions to mark systems as online
-    def encoder_callback(self, msg):
-        """Encoder data received - mark as online"""
-        if not self.encoder_online:
-            self.encoder_online = True
-            self.get_logger().info('Encoders came online')
+    def cmd_value_callback(self, msg):
+        """CMD value received - store latest value"""
+        if not self.cmd_value_online:
+            self.cmd_value_online = True
+            self.get_logger().info('Motor CMD value topic came online')
+        
+        # Store the latest CMD value that was actually published
+        self.latest_cmd_from_topic = msg.data
+    
+    def velocity_callback(self, msg):
+        """Velocity data received from control node"""
+        if not self.velocity_online:
+            self.velocity_online = True
+            self.get_logger().info('Motor velocity topic came online')
+        
+        try:
+            self.current_speed_mph = float(msg.data)
+            self.latest_velocity_received = True
+            
+            # Append standardized rows for both velocity and CMD value during test
+            # Use latest_cmd_from_topic to ensure we're pairing velocity with the
+            # CMD value that was actually published (not just what we're about to publish)
+            if self.test_started and not self.test_complete:
+                # Use base_automator's append_standard_row for consistent CSV format
+                self.append_standard_row('/motor/linear_velocity', [self.current_speed_mph])
+                self.append_standard_row('/motor/cmd_value', [self.latest_cmd_from_topic])
+        except ValueError:
+            self.get_logger().warn(f'Invalid velocity data: {msg.data}')
     # =================================== #
 
     def test_manager(self):
-        """Override base test manager to add distance checking"""
+        """Override base test manager to add speed checking"""
         # Call parent test manager for standard behavior
         super().test_manager()
         
-        # Add test-specific completion condition: distance traveled
+        # Add test-specific completion condition: speed reached target
         if self.test_started and not self.test_complete:
-            print("TODO")
-            # Specific conditional to automatically detect when the test should end.
+            # Check if we've reached target speed consistently
+            if self.current_speed_mph >= self.target_speed_mph:
+                self.speed_stable_count += 1
+                
+                if self.speed_stable_count >= self.speed_stable_threshold:
+                    self.get_logger().info(f'Target speed reached! Speed: {self.current_speed_mph:.2f} MPH at CMD: {self.current_cmd_value}')
+                    self.stop_test()
+                    return
+            else:
+                # Reset counter if speed drops below target
+                self.speed_stable_count = 0
+            
+            # Also check if we've reached max CMD value
+            if self.current_cmd_value >= self.max_cmd_value:
+                self.get_logger().info(f'Maximum CMD value reached ({self.max_cmd_value}). Final speed: {self.current_speed_mph:.2f} MPH')
+                self.stop_test()
+                return
 
     def test_actions(self):
+        """Start the speed calibration test"""
         self.get_logger().info('Starting speed calibration test')
-        self.line_following_active = True
         self.waiting_for_trigger = False
         
         if hasattr(self, 'waiting_timer'):
             self.waiting_timer.cancel()
         
-        # THEN enable data collection after a short delay
-        def enable_data_collection():
-            toggle_msg = Bool()
-            toggle_msg.data = True
-            self.toggle_pub.publish(toggle_msg)
-            self.get_logger().info('Data collection enabled - robot is now moving')
+        # Enable data collection immediately
+        toggle_msg = Bool()
+        toggle_msg.data = True
+        self.toggle_pub.publish(toggle_msg)
+        self.get_logger().info('Data collection enabled')
         
-        # Wait 1 second for control node to switch modes
-        self.create_timer(1.0, enable_data_collection)
+        # Start the CMD ramping timer (100ms updates for smooth acceleration)
+        self.cmd_ramp_timer = self.create_timer(0.1, self.ramp_cmd_value)
+        self.get_logger().info('CMD ramp started - robot will slowly accelerate')
+
+    def ramp_cmd_value(self):
+        """Slowly increment CMD value and send to motors"""
+        if not self.test_started or self.test_complete:
+            if self.cmd_ramp_timer:
+                self.cmd_ramp_timer.cancel()
+            return
+        
+        # Increment CMD value
+        self.current_cmd_value += self.cmd_increment
+        
+        # Clamp to max value
+        if self.current_cmd_value > self.max_cmd_value:
+            self.current_cmd_value = self.max_cmd_value
+        
+        # Send raw CMD value to control node
+        # The control node should subscribe to /motor/raw_cmd topic
+        # and directly apply this value to motors without speed conversion
+        cmd_msg = Int32()
+        cmd_msg.data = self.current_cmd_value
+        self.motor_cmd_pub.publish(cmd_msg)
+        
+        # Log progress every 50 CMD increments
+        if self.current_cmd_value % 50 == 0:
+            self.get_logger().info(f'CMD: {self.current_cmd_value}, Speed: {self.current_speed_mph:.2f} MPH')
 
     def joy_callback(self, msg: Joy):
         """Start the test on an external Joy A button rising edge (buttons[0])"""

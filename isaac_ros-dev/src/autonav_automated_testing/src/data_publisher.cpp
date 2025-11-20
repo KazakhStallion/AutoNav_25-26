@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -52,6 +53,8 @@ private:
     std::string latest_imu_data_;
     std::string latest_scan_data_;
     std::string latest_lines_data_;
+    std::string latest_motor_cmd_data_;
+    std::string latest_motor_velocity_data_;
     
     // Generic subscribers - will be created dynamically based on topics_to_monitor
     std::vector<rclcpp::SubscriptionBase::SharedPtr> dynamic_subscribers_;
@@ -183,6 +186,22 @@ private:
                 });
             dynamic_subscribers_.push_back(sub);
         }
+        else if (topic == "/motor/cmd_value") {
+            auto sub = this->create_subscription<std_msgs::msg::Int32>(
+                topic, 10,
+                [this](const std_msgs::msg::Int32::SharedPtr msg) {
+                    latest_motor_cmd_data_ = std::to_string(msg->data);
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/motor/linear_velocity") {
+            auto sub = this->create_subscription<std_msgs::msg::String>(
+                topic, 10,
+                [this](const std_msgs::msg::String::SharedPtr msg) {
+                    latest_motor_velocity_data_ = msg->data;
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
         // Add more topic types as needed
     }
 
@@ -198,6 +217,8 @@ private:
             latest_imu_data_.clear();
             latest_scan_data_.clear();
             latest_lines_data_.clear();
+            latest_motor_cmd_data_.clear();
+            latest_motor_velocity_data_.clear();
         } else {
             RCLCPP_INFO(this->get_logger(), "Data collection DISABLED");
         }
@@ -287,6 +308,24 @@ private:
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing lines: %s", msg.data.c_str());
+            }
+        }
+        
+        // Publish motor cmd data
+        if (!latest_motor_cmd_data_.empty()) {
+            msg.data = "/motor/cmd_value,Int32," + latest_motor_cmd_data_;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing motor_cmd: %s", msg.data.c_str());
+            }
+        }
+        
+        // Publish motor velocity data
+        if (!latest_motor_velocity_data_.empty()) {
+            msg.data = "/motor/linear_velocity,String," + latest_motor_velocity_data_;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing motor_velocity: %s", msg.data.c_str());
             }
         }
         
