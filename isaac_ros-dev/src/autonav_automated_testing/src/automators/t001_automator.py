@@ -21,7 +21,7 @@ Sequence: 0 -> 1 (wait 5s) -> 2 (wait 5s) -> 3 (wait 5s) -> 0 (complete)
 
 import rclpy
 from base_automator import BaseAutomator
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Joy
@@ -73,6 +73,8 @@ class T001Automator(BaseAutomator):
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         # Publish a one-time Joy toggle to enable autonomous mode in control node
         self.joy_pub = self.create_publisher(Joy, 'joy', 10)
+        # Publish navigation goals to Nav2
+        self.goal_pose_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         # ==================================== #
 
         # ===== Test Specific Subscribers ===== #
@@ -251,9 +253,59 @@ class T001Automator(BaseAutomator):
         lat, lon = self.waypoints[waypoint_index]
         self.get_logger().info(f'Publishing goal for waypoint {waypoint_index}: {lat:.6f}, {lon:.6f}')
         
-        # TODO: Publish to appropriate navigation topic
-        # For now, this is a placeholder - you'll need to integrate with your navigation stack
-        # This might publish to /goal_pose or similar depending on your setup
+        # Convert GPS coordinates to cartesian coordinates relative to starting position
+        # Starting position (waypoint 0) is the origin in the map frame
+        start_lat, start_lon = self.waypoints[0]
+        x, y = self.gps_to_cartesian(start_lat, start_lon, lat, lon)
+        
+        # Create and publish PoseStamped message to Nav2
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = self.get_clock().now().to_msg()
+        goal_pose.pose.position.x = x
+        goal_pose.pose.position.y = y
+        goal_pose.pose.position.z = 0.0
+        goal_pose.pose.orientation.x = 0.0
+        goal_pose.pose.orientation.y = 0.0
+        goal_pose.pose.orientation.z = 0.0
+        goal_pose.pose.orientation.w = 1.0
+        
+        self.goal_pose_pub.publish(goal_pose)
+        self.get_logger().info(f'Published goal pose: x={x:.2f}, y={y:.2f}')
+
+    def gps_to_cartesian(self, ref_lat, ref_lon, target_lat, target_lon):
+        """
+        Convert GPS coordinates to cartesian coordinates relative to a reference point.
+        
+        Args:
+            ref_lat: Reference latitude (origin)
+            ref_lon: Reference longitude (origin)
+            target_lat: Target latitude
+            target_lon: Target longitude
+            
+        Returns:
+            tuple: (x, y) in meters relative to reference point
+        """
+        # Earth's radius in meters
+        R = 6371000
+        
+        # Convert to radians
+        ref_lat_rad = math.radians(ref_lat)
+        ref_lon_rad = math.radians(ref_lon)
+        target_lat_rad = math.radians(target_lat)
+        target_lon_rad = math.radians(target_lon)
+        
+        # Calculate differences
+        delta_lat = target_lat_rad - ref_lat_rad
+        delta_lon = target_lon_rad - ref_lon_rad
+        
+        # Y direction (latitude/North) distance in meters
+        y = delta_lat * R
+        
+        # X direction (longitude/East) distance in meters, adjusted for latitude
+        x = delta_lon * R * math.cos(ref_lat_rad)
+        
+        return x, y
 
     def gps_callback(self, msg: NavSatFix):
         """Track GPS position for distance calculation"""
