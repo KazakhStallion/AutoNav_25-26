@@ -104,9 +104,9 @@ DOCKER_ARGS+=("-e NVIDIA_DRIVER_CAPABILITIES=all")
 VID_GID=$(getent group video  | cut -d: -f3)
 REN_GID=$(getent group render | cut -d: -f3)
 INPUT_GID=$(getent group input | cut -d: -f3)
-if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add $VID_GID"); fi
-if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add $REN_GID"); fi
-if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add $INPUT_GID"); fi
+if [[ -n "$VID_GID" ]]; then DOCKER_ARGS+=("--group-add=${VID_GID}"); fi
+if [[ -n "$REN_GID" ]]; then DOCKER_ARGS+=("--group-add=${REN_GID}"); fi
+if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add=${INPUT_GID}"); fi
 
 # RE-USE EXISTING CONTAINER
 if [ "$(docker ps -a --quiet --filter status=running --filter name=^/${CONTAINER_NAME}$)" ]; then
