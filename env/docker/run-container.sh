@@ -57,6 +57,16 @@ if [[ $PLATFORM == "aarch64" ]]; then
     fi
 fi
 
+# SERIAL / USB SYMLINKS AND E-STOP UART
+# Mount stable USB serial symlinks (if present) and expose Jetson UART for e-stop
+if [[ -d /dev/serial/by-id ]]; then
+    DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
+fi
+if [[ -e /dev/ttyTHS1 ]]; then
+    DOCKER_ARGS+=("--device=/dev/ttyTHS1") # E-stop serial port (UART)
+fi
+
+
 # MOUNTS & WORKING DIRECTORY
 DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
