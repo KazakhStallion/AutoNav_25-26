@@ -19,12 +19,13 @@ USERNAME="${USERNAME:-admin}"
 DOCKER_ARGS=()
 
 # ENVIRONMENT VARIABLES
-DOCKER_ARGS+=("-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
-DOCKER_ARGS+=("-e USER=${USERNAME}")
-DOCKER_ARGS+=("-e USERNAME=${USERNAME}")
-DOCKER_ARGS+=("-e HOST_USER_UID=$(id -u)")
-DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
-DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
+# ENVIRONMENT VARIABLES
+DOCKER_ARGS+=("-e" "ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}")
+DOCKER_ARGS+=("-e" "USER=${USERNAME}")
+DOCKER_ARGS+=("-e" "USERNAME=${USERNAME}")
+DOCKER_ARGS+=("-e" "HOST_USER_UID=$(id -u)")
+DOCKER_ARGS+=("-e" "HOST_USER_GID=$(id -g)")
+DOCKER_ARGS+=("-e" "WORKDIR=${CONTAINER_WORKDIR}")
 
 # BLUETOOTH AND DBUS
 DOCKER_ARGS+=("-v" "/run/dbus:/run/dbus")
@@ -132,7 +133,7 @@ docker run -it \
     --device-cgroup-rule='c 13:* rmw' \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=all \
-    --device /dev/bus/usb:/dev/bus/usb \
+    --device=/dev/bus/usb:/dev/bus/usb \
     "${DOCKER_ARGS[@]}" \
     --name "$CONTAINER_NAME" \
     $IMAGE_TAG \
