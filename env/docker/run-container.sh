@@ -57,13 +57,20 @@ if [[ $PLATFORM == "aarch64" ]]; then
     fi
 fi
 
-# SERIAL / USB SYMLINKS AND E-STOP UART
-# Mount stable USB serial symlinks (if present) and expose Jetson UART for e-stop
-if [[ -d /dev/serial/by-id ]]; then
-    DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
-fi
+# SERIAL / USB / CAMERA DEVICES
+# Always mount stable USB serial symlinks
+DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
+
+# Pass through all current USB serial and video devices
+for dev in /dev/ttyACM* /dev/ttyUSB* /dev/video*; do
+    if [[ -e "$dev" ]]; then
+        DOCKER_ARGS+=("--device=$dev")
+    fi
+done
+
+# Jetson UART for e-stop
 if [[ -e /dev/ttyTHS1 ]]; then
-    DOCKER_ARGS+=("--device=/dev/ttyTHS1") # E-stop serial port (UART)
+    DOCKER_ARGS+=("--device=/dev/ttyTHS1")
 fi
 
 
@@ -129,7 +136,7 @@ docker run -it \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=all \
     --device /dev/bus/usb:/dev/bus/usb \
-    ${DOCKER_ARGS[@]} \
+    "${DOCKER_ARGS[@]}" \
     --name "$CONTAINER_NAME" \
     $IMAGE_TAG \
     /bin/bash
