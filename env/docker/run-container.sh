@@ -77,7 +77,7 @@ fi
 # MOUNTS & WORKING DIRECTORY
 DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
 DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
-DOCKER_ARGS+=("--workdir ${CONTAINER_WORKDIR}/isaac_ros-dev")
+DOCKER_ARGS+=("--workdir=${CONTAINER_WORKDIR}/isaac_ros-dev")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
 DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
 
