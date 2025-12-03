@@ -27,39 +27,38 @@ DOCKER_ARGS+=("-e HOST_USER_GID=$(id -g)")
 DOCKER_ARGS+=("-e WORKDIR=${CONTAINER_WORKDIR}")
 
 # BLUETOOTH AND DBUS
-DOCKER_ARGS+=("-v /run/dbus:/run/dbus")
-DOCKER_ARGS+=("-v /dev/input:/dev/input")
-DOCKER_ARGS+=("-v /run/udev:/run/udev:ro")
-DOCKER_ARGS+=( "--network=host" )
+DOCKER_ARGS+=("-v" "/run/dbus:/run/dbus")
+DOCKER_ARGS+=("-v" "/dev/input:/dev/input")
+DOCKER_ARGS+=("-v" "/run/udev:/run/udev:ro")
+DOCKER_ARGS+=("--network=host")
 
 # DISPLAY FORWARDING
-DOCKER_ARGS+=("-v /tmp/.X11-unix:/tmp/.X11-unix")
-DOCKER_ARGS+=("-v $HOME/.Xauthority:/home/${USERNAME}/.Xauthority:rw")
-DOCKER_ARGS+=("-e DISPLAY")
+DOCKER_ARGS+=("-v" "/tmp/.X11-unix:/tmp/.X11-unix")
+DOCKER_ARGS+=("-v" "$HOME/.Xauthority:/home/${USERNAME}/.Xauthority:rw")
+DOCKER_ARGS+=("-e" "DISPLAY")
 
 # SSH AGENT
 if [[ -n $SSH_AUTH_SOCK ]]; then
-    DOCKER_ARGS+=("-v $SSH_AUTH_SOCK:/ssh-agent")
-    DOCKER_ARGS+=("-e SSH_AUTH_SOCK=/ssh-agent")
+    DOCKER_ARGS+=("-v" "$SSH_AUTH_SOCK:/ssh-agent")
+    DOCKER_ARGS+=("-e" "SSH_AUTH_SOCK=/ssh-agent")
 fi
 
 # JETSON SPECIFIC
 if [[ $PLATFORM == "aarch64" ]]; then
     echo "Detected Jetson platform (aarch64)"
-    # Jetson-specific mounts and devices
-    DOCKER_ARGS+=("-v /usr/bin/tegrastats:/usr/bin/tegrastats")
-    DOCKER_ARGS+=("-v /tmp/:/tmp/")
+    DOCKER_ARGS+=("-v" "/usr/bin/tegrastats:/usr/bin/tegrastats")
+    DOCKER_ARGS+=("-v" "/tmp/:/tmp/")
     DOCKER_ARGS+=("--pid=host")
     
     # jtop support
     if [[ $(getent group jtop) ]]; then
-        DOCKER_ARGS+=("-v /run/jtop.sock:/run/jtop.sock:ro")
+        DOCKER_ARGS+=("-v" "/run/jtop.sock:/run/jtop.sock:ro")
     fi
 fi
 
 # SERIAL / USB / CAMERA DEVICES
 # Always mount stable USB serial symlinks
-DOCKER_ARGS+=("-v /dev/serial/by-id:/dev/serial/by-id:ro")
+DOCKER_ARGS+=("-v" "/dev/serial/by-id:/dev/serial/by-id:ro")
 
 # Pass through all current USB serial and video devices
 for dev in /dev/ttyACM* /dev/ttyUSB* /dev/video*; do
@@ -75,23 +74,21 @@ fi
 
 
 # MOUNTS & WORKING DIRECTORY
-DOCKER_ARGS+=("-v ${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
-DOCKER_ARGS+=("-v /etc/localtime:/etc/localtime:ro")
+DOCKER_ARGS+=("-v" "${HOST_WORKDIR}:${CONTAINER_WORKDIR}")
+DOCKER_ARGS+=("-v" "/etc/localtime:/etc/localtime:ro")
 DOCKER_ARGS+=("--workdir=${CONTAINER_WORKDIR}/isaac_ros-dev")
-DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
-DOCKER_ARGS+=("-v $SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
-
+DOCKER_ARGS+=("-v" "$SCRIPT_DIR/entrypoint_additions:/usr/local/bin/scripts/entrypoint_additions")
+DOCKER_ARGS+=("-v" "$SCRIPT_DIR/entrypoint.sh:/usr/local/bin/scripts/entrypoint.sh")
 # PERSISTENT BUILD VOLUMES
-DOCKER_ARGS+=("-v ${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/build")
-DOCKER_ARGS+=("-v ${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
-DOCKER_ARGS+=("-v ${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
-
+DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/build")
+DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
+DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
 # ZED settings/resources
 if [[ -d "$HOME/zed/settings" ]]; then
-    DOCKER_ARGS+=("-v $HOME/zed/settings:/usr/local/zed/settings")
+    DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/settings")
 fi
 if [[ -d "$HOME/zed/resources" ]]; then
-    DOCKER_ARGS+=("-v $HOME/zed/resources:/usr/local/zed/resources")
+    DOCKER_ARGS+=("-v" "$HOME/zed/resources:/usr/local/zed/resources")
 fi
 
 DOCKER_ARGS+=("--entrypoint=$ENTRYPOINT")
