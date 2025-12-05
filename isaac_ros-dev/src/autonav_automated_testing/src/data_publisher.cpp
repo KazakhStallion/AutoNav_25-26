@@ -14,7 +14,6 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
-#include <mutex>
 
 /**
  * @brief Data Publisher Node for Automated Testing
@@ -44,9 +43,6 @@ private:
     bool collecting_data_;
     bool estop_triggered_;
     std::string test_id_;
-    
-    // Mutex to protect shared data from race conditions
-    std::mutex data_mutex_;
     
     // Latest data storage
     std::string latest_gps_data_;
@@ -174,7 +170,6 @@ private:
                 [this](const autonav_interfaces::msg::Encoders::SharedPtr msg) {
                     std::stringstream ss;
                     ss << msg->left_motor_count << "," << msg->right_motor_count;
-                    std::lock_guard<std::mutex> lock(data_mutex_);
                     latest_encoder_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
@@ -232,21 +227,9 @@ private:
         // Publish data for each topic separately in the format expected by base_automator:
         // "topic_name,data_type,data_values"
         
+        
         auto msg = std_msgs::msg::String();
         static int debug_count = 0;
-        
-        // Make local copies of data with mutex protection to avoid race conditions
-        std::string gps_data, imu_data, scan_data, odom_data, cmd_vel_data, encoder_data, lines_data;
-        {
-            std::lock_guard<std::mutex> lock(data_mutex_);
-            gps_data = latest_gps_data_;
-            imu_data = latest_imu_data_;
-            scan_data = latest_scan_data_;
-            odom_data = latest_odom_data_;
-            cmd_vel_data = latest_cmd_vel_data_;
-            encoder_data = latest_encoder_data_;
-            lines_data = latest_lines_data_;
-        }
         
         // Publish GPS data
         if (!gps_data.empty()) {
