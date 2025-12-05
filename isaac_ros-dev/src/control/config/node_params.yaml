@@ -2,8 +2,8 @@ control_node:
   ros__parameters:
     # \/ ------------------configure serial ports here 
 
-    motor_port: "/dev/ttyACM0"
-    arduino_port: "/dev/ttyACM1"
+    motor_port: "/dev/serial/by-id/usb-RoboteQ_RoboteQ_FBLG2360T_HABJAA5QR0E5NDEg_207A34554147-if00"
+    arduino_port: "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_8583030363935190F141-if00"
     estop_port: "/dev/ttyTHS1"
 
     # \/ ------------------configure topic names here
