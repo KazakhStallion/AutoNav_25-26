@@ -27,8 +27,17 @@ private:
     const uint8_t REG_CURRENT = 0x04;  // Current register
 
     // Create some data storage variables here:
+    double voltage_mV_ = 0.0;
+    double current_mA_ = 0.0;
+    double power_mW_   = 0.0;
+
+    bool chip_ready_ = false;
 
     // Declare publishers here:
+
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr voltage_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr current_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr power_pub_;
 
     // Timer for fixed-rate I2C polling loop
     rclcpp::TimerBase::SharedPtr i2c_timer_;
@@ -38,65 +47,47 @@ private:
     // I2C polling callback - runs at fixed rate (loop_rate_hz_)
     // ================================================================
     void i2c_timer_callback() {
-        // This function runs at a fixed rate (e.g., 10 Hz)
-        // Add your chain of I2C commands here:
+        if (!chip_ready_) {
+            return;
+        }
 
-        // Example: Read voltage, current, and power in sequence
-        //
-        // uint8_t read_buffer[2];
-        // int16_t raw_value;
-        //
-        // // --- Read Voltage from REG_VOLTAGE (0x02) ---
-        // uint8_t reg = REG_VOLTAGE;
-        // if (write(i2c_fd_, &reg, 1) == 1) {
-        //     if (read(i2c_fd_, read_buffer, 2) == 2) {
-        //         raw_value = (read_buffer[0] << 8) | read_buffer[1];
-        //         double voltage_mV = raw_value * bit_2_mVolt;
-        //         RCLCPP_INFO(this->get_logger(), "Voltage: %.2f mV", voltage_mV);
-        //     }
-        // }
-        //
-        // // --- Read Power from REG_POWER (0x03) ---
-        // reg = REG_POWER;
-        // if (write(i2c_fd_, &reg, 1) == 1) {
-        //     if (read(i2c_fd_, read_buffer, 2) == 2) {
-        //         raw_value = (read_buffer[0] << 8) | read_buffer[1];
-        //         double power_mW = raw_value * bit_2_mWatt;
-        //         RCLCPP_INFO(this->get_logger(), "Power: %.2f mW", power_mW);
-        //     }
-        // }
-        //
-        // // --- Read Current from REG_CURRENT (0x04) ---
-        // reg = REG_CURRENT;
-        // if (write(i2c_fd_, &reg, 1) == 1) {
-        //     if (read(i2c_fd_, read_buffer, 2) == 2) {
-        //         raw_value = (read_buffer[0] << 8) | read_buffer[1];
-        //         double current_mA = raw_value * bit_2_mAmp;
-        //         RCLCPP_INFO(this->get_logger(), "Current: %.2f mA", current_mA);
-        //     }
-        // }
-        //
-        // // ================================================================
-        // // Publish the three data values to their respective topics
-        // // ================================================================
-        // //
-        // // Create message objects
-        // auto voltage_msg = std_msgs::msg::Float32();
-        // auto current_msg = std_msgs::msg::Float32();
-        // auto power_msg = std_msgs::msg::Float32();
-        // //
-        // // Set the data (convert mV to V, mA to A, mW to W if desired)
-        // voltage_msg.data = voltage_mV / 1000.0;  // Convert mV to V
-        // current_msg.data = current_mA / 1000.0;  // Convert mA to A
-        // power_msg.data = power_mW / 1000.0;      // Convert mW to W
-        // //
-        // // Publish to topics
-        // voltage_pub_->publish(voltage_msg);
-        // current_pub_->publish(current_msg);
-        // power_pub_->publish(power_msg);
-        // //
-        // // ================================================================
+        uint8_t buf[2];
+        int16_t raw;
+
+        // Voltage
+        uint8_t reg = REG_VOLTAGE;
+        if (write(i2c_fd_, &reg, 1) == 1 && read(i2c_fd_, buf, 2) == 2) {
+            raw = (buf[0] << 8) | buf[1];
+            voltage_mV_ = raw * bit_2_mVolt;
+        }
+
+        // Current
+        reg = REG_CURRENT;
+        if (write(i2c_fd_, &reg, 1) == 1 && read(i2c_fd_, buf, 2) == 2) {
+            raw = (buf[0] << 8) | buf[1];
+            current_mA_ = raw * bit_2_mAmp;
+        }
+
+        // Power
+        reg = REG_POWER;
+        if (write(i2c_fd_, &reg, 1) == 1 && read(i2c_fd_, buf, 2) == 2) {
+            raw = (buf[0] << 8) | buf[1];
+            power_mW_ = raw * bit_2_mWatt;
+        }
+
+        // Publish
+        std_msgs::msg::Float32 msg;
+
+        msg.data = voltage_mV_ / 1000.0;
+        voltage_pub_->publish(msg);
+
+        msg.data = current_mA_ / 1000.0;
+        current_pub_->publish(msg);
+
+        msg.data = power_mW_ / 1000.0;
+        power_pub_->publish(msg);
     }
+
 
     // I2C helper functions
     bool open_i2c(const std::string& device, int address) {
@@ -175,31 +166,46 @@ public:
         //   2. Read the data bytes
         //
         // Step 1: Open I2C bus and set slave address to 0x40 (if not already open)
-        //     if (!open_i2c("/dev/i2c-7", 0x40)) {
-        //         RCLCPP_ERROR(this->get_logger(), "Failed to open I2C for 0x40");
-        //         return;
-        //     }
+            if (!open_i2c("/dev/i2c-7", 0x40)) {
+                RCLCPP_ERROR(this->get_logger(), "I2C init failed");
+                return;
+            }   
+
         //
         // Step 2: Write the register address to set the pointer
-        //     uint8_t reg_addr = 0x05;
-        //     if (write(i2c_fd_, &reg_addr, 1) != 1) {
-        //         RCLCPP_ERROR(this->get_logger(), "Failed to set register pointer");
-        //         return;
-        //     }
-        //
+            uint8_t calib_buf[3] = {0x05, 0x01, 0xAA};
+            if (write(i2c_fd_, calib_buf, sizeof(calib_buf)) != sizeof(calib_buf)) {
+                RCLCPP_ERROR(this->get_logger(), "Calibration write failed");
+                return;
+            }
+
         // Step 3: Read the data from that register
-        //     uint8_t read_buffer[2];  // Reading 2 bytes
-        //     if (read(i2c_fd_, read_buffer, sizeof(read_buffer)) != sizeof(read_buffer)) {
-        //         RCLCPP_ERROR(this->get_logger(), "I2C read failed");
-        //     } else {
-        //         RCLCPP_INFO(this->get_logger(), "Read from 0x05: 0x%02X 0x%02X",
-        //                     read_buffer[0], read_buffer[1]);
-        //     }
-        //
+            uint8_t reg = 0x05;
+            uint8_t read_buf[2];
+
+            if (write(i2c_fd_, &reg, 1) == 1 &&
+              read(i2c_fd_, read_buf, 2) == 2 &&
+              read_buf[0] == 0x01 &&
+              read_buf[1] == 0xAA) {
+
+              chip_ready_ = true;
+              RCLCPP_INFO(this->get_logger(), "Electrical board ready");
+            } else {
+              RCLCPP_ERROR(this->get_logger(), "Electrical board not ready");
+            }
         
         // ================================================================
 
         // Create a topic to publish to here:
+
+        voltage_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+            "/electrical/voltage", 10);
+
+        current_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+            "/electrical/current", 10);
+
+        power_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+            "/electrical/power", 10);
 
         // ================================================================
         // Create timer for fixed-rate I2C polling loop
