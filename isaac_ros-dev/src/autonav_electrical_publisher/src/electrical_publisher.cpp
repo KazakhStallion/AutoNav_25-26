@@ -89,7 +89,7 @@ private:
 
         RCLCPP_INFO(this->get_logger(),
             "V=%.2f V | I=%.3f A | P=%.1f W",
-            msg.data, current_mA_ / 1000.0, power_mW_ / 1000.0);
+            voltage_mV_ / 1000.0, current_mA_ / 1000.0, power_mW_ / 1000.0);
     }
 
 
