@@ -16,10 +16,10 @@ private:
     int i2c_fd_;
     // int i2c_address_ = 0x48;  // TODO: Set your I2C device address
 
-    // Conversion factors (multiply by raw decimal value from I2C)
-    const double bit_2_mVolt = 1.25;   // Convert raw bits to millivolts
-    const double bit_2_mAmp  = 1.0;    // Convert raw bits to milliamps
-    const double bit_2_mWatt = 25.0;   // Convert raw bits to milliwatts
+    // INA226 conversion factors (per-bit LSB values)
+    const double bit_2_mVolt = 1.25;    // 1.25 mV/bit (bus voltage LSB)
+    const double bit_2_mAmp  = 0.25;   // 250 µA/bit (current LSB)
+    const double bit_2_mWatt = 6.25;   // 6.25 mW/bit (power LSB = 25 * current LSB)
 
     // I2C register/pointer addresses for each measurement
     const uint8_t REG_VOLTAGE = 0x02;  // Voltage register
@@ -75,7 +75,7 @@ private:
             power_mW_ = raw * bit_2_mWatt;
         }
 
-        // Publish
+        // Publish (convert milli-units to base units)
         std_msgs::msg::Float32 msg;
 
         msg.data = voltage_mV_ / 1000.0;
@@ -86,6 +86,10 @@ private:
 
         msg.data = power_mW_ / 1000.0;
         power_pub_->publish(msg);
+
+        RCLCPP_INFO(this->get_logger(),
+            "V=%.2f V | I=%.3f A | P=%.1f W",
+            msg.data, current_mA_ / 1000.0, power_mW_ / 1000.0);
     }
 
 
@@ -173,25 +177,29 @@ public:
 
         //
         // Step 2: Write the register address to set the pointer
-            uint8_t calib_buf[3] = {0x05, 0x01, 0xAA};
+            // Write INA226 calibration register (0x05) with CAL = 2048 (0x0800)
+            // CAL = 0.00512 / (CURRENT_LSB * R_SHUNT) = 0.00512 / (0.00025 * 0.010) = 2048
+            uint8_t calib_buf[3] = {0x05, 0x08, 0x00};
             if (write(i2c_fd_, calib_buf, sizeof(calib_buf)) != sizeof(calib_buf)) {
                 RCLCPP_ERROR(this->get_logger(), "Calibration write failed");
                 return;
             }
 
-        // Step 3: Read the data from that register
+        // Step 3: Read back calibration register to verify
             uint8_t reg = 0x05;
             uint8_t read_buf[2];
 
             if (write(i2c_fd_, &reg, 1) == 1 &&
               read(i2c_fd_, read_buf, 2) == 2 &&
-              read_buf[0] == 0x01 &&
-              read_buf[1] == 0xAA) {
+              read_buf[0] == 0x08 &&
+              read_buf[1] == 0x00) {
 
               chip_ready_ = true;
-              RCLCPP_INFO(this->get_logger(), "Electrical board ready");
+              RCLCPP_INFO(this->get_logger(), "INA226 calibrated and ready (CAL=2048)");
             } else {
-              RCLCPP_ERROR(this->get_logger(), "Electrical board not ready");
+              RCLCPP_ERROR(this->get_logger(),
+                "INA226 calibration readback failed (got 0x%02X%02X, expected 0x0800)",
+                read_buf[0], read_buf[1]);
             }
         
         // ================================================================
