@@ -279,15 +279,30 @@ void LineDetectorNode::cacheAndPublishLinePoints(
 
 void LineDetectorNode::publishHeldOrEmpty(const char * reason)
 {
-	(void)line_hold_timeout_ms_;
-	(void)last_valid_detection_time_;
-
 	if (has_last_valid_message_ && !last_valid_message_.points.empty()) {
+		const rclcpp::Duration hold_timeout =
+			rclcpp::Duration::from_nanoseconds(line_hold_timeout_ms_ * 1000000LL);
+		const rclcpp::Duration age = this->now() - last_valid_detection_time_;
+
+		if (line_hold_timeout_ms_ > 0 && age > hold_timeout) {
+			auto empty_message = autonav_interfaces::msg::LinePoints();
+			empty_message.header.frame_id = target_frame_;
+			empty_message.header.stamp = this->now();
+			RCLCPP_WARN_THROTTLE(
+				get_logger(), *get_clock(), 3000,
+				"Clearing held line obstacle set after %s because cached data is %.1f ms old",
+				reason, age.seconds() * 1000.0);
+			publishLinePoints(empty_message);
+			return;
+		}
+
+		auto held_message = last_valid_message_;
+		held_message.header.stamp = this->now();
 		RCLCPP_WARN_THROTTLE(
 			get_logger(), *get_clock(), 3000,
 			"Reusing previous line obstacle set after %s",
 			reason);
-		publishLinePoints(last_valid_message_);
+		publishLinePoints(held_message);
 		return;
 	}
 
@@ -295,6 +310,11 @@ void LineDetectorNode::publishHeldOrEmpty(const char * reason)
 		get_logger(), *get_clock(), 3000,
 		"Skipping line publish after %s because no valid line set is cached yet",
 		reason);
+
+	auto empty_message = autonav_interfaces::msg::LinePoints();
+	empty_message.header.frame_id = target_frame_;
+	empty_message.header.stamp = this->now();
+	publishLinePoints(empty_message);
 }
 
 /**

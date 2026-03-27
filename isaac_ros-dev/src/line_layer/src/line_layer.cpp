@@ -395,6 +395,15 @@ LineLayer::updateCosts(
   max_i = std::min(static_cast<int>(size_x), max_i);
   max_j = std::min(static_cast<int>(size_y), max_j);
 
+  auto clear_layer = [&]() {
+    resetMaps();
+    updateWithMax(master_grid, min_i, min_j, max_i, max_j);
+    current_ = true;
+    if (publish_costmap_) {
+      publishCostmap();
+    }
+  };
+
   #ifdef DEBUG_n
   RCLCPP_INFO(rclcpp::get_logger("nav2_costmap_2d"), "bounds: (min_x: %d), (min_y: %d), (max_x: %d), (max_y: %d)",min_i, max_i, min_j, max_j );
   #endif
@@ -411,10 +420,7 @@ LineLayer::updateCosts(
     RCLCPP_DEBUG_THROTTLE(
       rclcpp::get_logger("nav2_costmap_2d"), *node_.lock()->get_clock(), 2000,
       "line_layer buffer empty; waiting for line points");
-    if (publish_costmap_) {
-      publishCostmap();
-    }
-    current_ = true;
+    clear_layer();
     return;
   }
   auto last_msg = *last;
@@ -422,16 +428,13 @@ LineLayer::updateCosts(
     RCLCPP_WARN_THROTTLE(
       rclcpp::get_logger("nav2_costmap_2d"), *node_.lock()->get_clock(), 2000,
       "line_layer received an empty buffered message");
-    if (publish_costmap_) {
-      publishCostmap();
-    }
-    current_ = true;
+    clear_layer();
     return;
   }
 
   auto transformed_points = transformPointsToGlobalFrame(*last_msg);
   if (!transformed_points) {
-    current_ = true;
+    clear_layer();
     return;
   }
 
