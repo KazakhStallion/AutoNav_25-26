@@ -151,7 +151,7 @@ local_costmap:
       width: 6
       height: 6
       resolution: 0.05
-      robot_radius: 0.2
+      robot_radius: 0.41
       plugins: ["obstacle_layer", "line_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -192,7 +192,7 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
-      robot_radius: 0.3
+      robot_radius: 0.41
       resolution: 0.05
       width: 50
       height: 50
