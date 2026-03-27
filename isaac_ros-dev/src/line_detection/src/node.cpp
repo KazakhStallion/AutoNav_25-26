@@ -16,6 +16,7 @@
 #include <image_geometry/pinhole_camera_model.h>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <mutex>
 #include <cstring>
 
@@ -37,7 +38,7 @@ public:
 		this->declare_parameter("publish_interval_ms", 250);
 		this->declare_parameter("max_rgb_depth_delta_ms", 120);
 		this->declare_parameter("tf_lookup_timeout_ms", 100);
-		this->declare_parameter("line_hold_timeout_ms", 5000);
+		this->declare_parameter("line_hold_timeout_ms", 0);
 		
 		std::string camera_topic = this->get_parameter("camera_topic").as_string();
 		std::string depth_camera_topic = this->get_parameter("depth_camera_topic").as_string();
@@ -97,6 +98,10 @@ public:
 		_line_service = this->create_service<autonav_interfaces::srv::AnvLines>(
 			"line_service",
 			std::bind(&LineDetectorNode::line_service, this, std::placeholders::_1, std::placeholders::_2));
+
+		_clear_lines_service = this->create_service<std_srvs::srv::Trigger>(
+			"clear_remembered_lines",
+			std::bind(&LineDetectorNode::clearRememberedLines, this, std::placeholders::_1, std::placeholders::_2));
 			
 		RCLCPP_INFO(this->get_logger(), "LineDetectorNode initialized - waiting for camera data...");
 	}
@@ -108,6 +113,7 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr _camera_model_sub;
 
 	rclcpp::Service<autonav_interfaces::srv::AnvLines>::SharedPtr _line_service;
+	rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr _clear_lines_service;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr _line_point_cloud_pub; 
 	rclcpp::Publisher<autonav_interfaces::msg::LinePoints>::SharedPtr _line_pub;
 	rclcpp::TimerBase::SharedPtr _line_timer;
@@ -131,7 +137,7 @@ private:
 	int64_t publish_interval_ms_ = 250;
 	int64_t max_rgb_depth_delta_ms_ = 120;
 	int64_t tf_lookup_timeout_ms_ = 100;
-	int64_t line_hold_timeout_ms_ = 5000;
+	int64_t line_hold_timeout_ms_ = 0;
 	autonav_interfaces::msg::LinePoints last_valid_message_;
 	rclcpp::Time last_valid_detection_time_{0, 0, RCL_ROS_TIME};
 	bool has_last_valid_message_ = false;
@@ -139,6 +145,9 @@ private:
 	void line_service(
 		const std::shared_ptr<autonav_interfaces::srv::AnvLines::Request> request,
 		std::shared_ptr<autonav_interfaces::srv::AnvLines::Response> response);
+	void clearRememberedLines(
+		const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+		std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 	
 	void line_callback();
 
@@ -156,6 +165,10 @@ private:
 		const builtin_interfaces::msg::Time & stamp) const;
 
 	void publishLinePoints(const autonav_interfaces::msg::LinePoints & message);
+	void publishLivePointCloud(
+		const std::vector<Eigen::Vector3d> & points,
+		const builtin_interfaces::msg::Time & stamp);
+	void publishEmptyPointCloud(const builtin_interfaces::msg::Time & stamp);
 	void cacheAndPublishLinePoints(
 		const std::vector<Eigen::Vector3d> & points,
 		const builtin_interfaces::msg::Time & stamp);
@@ -267,6 +280,27 @@ void LineDetectorNode::publishLinePoints(const autonav_interfaces::msg::LinePoin
 	_line_pub->publish(message);
 }
 
+void LineDetectorNode::publishLivePointCloud(
+	const std::vector<Eigen::Vector3d> & points,
+	const builtin_interfaces::msg::Time & stamp)
+{
+	std::vector<std::array<float, 3>> point_cloud_points;
+	point_cloud_points.reserve(points.size());
+	for (const auto & point : points) {
+		point_cloud_points.push_back(
+			{static_cast<float>(point.x()), static_cast<float>(point.y()), static_cast<float>(point.z())});
+	}
+
+	sensor_msgs::msg::PointCloud2 pc = createPointCloud(point_cloud_points, target_frame_, stamp);
+	_line_point_cloud_pub->publish(pc);
+}
+
+void LineDetectorNode::publishEmptyPointCloud(const builtin_interfaces::msg::Time & stamp)
+{
+	sensor_msgs::msg::PointCloud2 pc = createPointCloud({}, target_frame_, stamp);
+	_line_point_cloud_pub->publish(pc);
+}
+
 void LineDetectorNode::cacheAndPublishLinePoints(
 	const std::vector<Eigen::Vector3d> & points,
 	const builtin_interfaces::msg::Time & stamp)
@@ -279,28 +313,36 @@ void LineDetectorNode::cacheAndPublishLinePoints(
 
 void LineDetectorNode::publishHeldOrEmpty(const char * reason)
 {
-	if (has_last_valid_message_ && !last_valid_message_.points.empty()) {
-		const rclcpp::Duration hold_timeout =
-			rclcpp::Duration::from_nanoseconds(line_hold_timeout_ms_ * 1000000LL);
-		const rclcpp::Duration age = this->now() - last_valid_detection_time_;
+	publishEmptyPointCloud(this->now());
 
-		if (line_hold_timeout_ms_ > 0 && age > hold_timeout) {
-			auto empty_message = autonav_interfaces::msg::LinePoints();
-			empty_message.header.frame_id = target_frame_;
-			empty_message.header.stamp = this->now();
-			RCLCPP_WARN_THROTTLE(
-				get_logger(), *get_clock(), 3000,
-				"Clearing held line obstacle set after %s because cached data is %.1f ms old",
-				reason, age.seconds() * 1000.0);
-			publishLinePoints(empty_message);
-			return;
+	if (has_last_valid_message_ && !last_valid_message_.points.empty()) {
+		const rclcpp::Time now = this->now();
+
+		if (line_hold_timeout_ms_ > 0) {
+			const rclcpp::Duration hold_timeout =
+				rclcpp::Duration::from_nanoseconds(line_hold_timeout_ms_ * 1000000LL);
+			const rclcpp::Duration age = now - last_valid_detection_time_;
+			if (age > hold_timeout) {
+				auto empty_message = autonav_interfaces::msg::LinePoints();
+				empty_message.header.frame_id = target_frame_;
+				empty_message.header.stamp = now;
+				has_last_valid_message_ = false;
+				last_valid_message_ = autonav_interfaces::msg::LinePoints();
+				last_valid_detection_time_ = now;
+				RCLCPP_WARN_THROTTLE(
+					get_logger(), *get_clock(), 3000,
+					"Clearing held line obstacle set after %s because cached data is %.1f ms old",
+					reason, age.seconds() * 1000.0);
+				publishLinePoints(empty_message);
+				return;
+			}
 		}
 
 		auto held_message = last_valid_message_;
-		held_message.header.stamp = this->now();
+		held_message.header.stamp = now;
 		RCLCPP_WARN_THROTTLE(
 			get_logger(), *get_clock(), 3000,
-			"Reusing previous line obstacle set after %s",
+			"Reusing remembered line obstacle set after %s",
 			reason);
 		publishLinePoints(held_message);
 		return;
@@ -315,6 +357,27 @@ void LineDetectorNode::publishHeldOrEmpty(const char * reason)
 	empty_message.header.frame_id = target_frame_;
 	empty_message.header.stamp = this->now();
 	publishLinePoints(empty_message);
+}
+
+void LineDetectorNode::clearRememberedLines(
+	const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+	std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+	(void)request;
+
+	has_last_valid_message_ = false;
+	last_valid_message_ = autonav_interfaces::msg::LinePoints();
+	last_valid_detection_time_ = this->now();
+
+	auto empty_message = autonav_interfaces::msg::LinePoints();
+	empty_message.header.frame_id = target_frame_;
+	empty_message.header.stamp = this->now();
+	publishLinePoints(empty_message);
+	publishEmptyPointCloud(empty_message.header.stamp);
+
+	response->success = true;
+	response->message = "Cleared remembered line obstacle set";
+	RCLCPP_INFO(this->get_logger(), "Cleared remembered line obstacle set");
 }
 
 /**
@@ -459,30 +522,12 @@ std::vector<Eigen::Vector3d> LineDetectorNode::map_transform(
 		"Processing: %d valid, %d invalid_depth, %d out_of_bounds -> %d transformed points",
 		valid_count, invalid_depth, out_of_bounds, tf_success);
 
-	// Publish debug cloud in target frame if transform succeeded; fallback to camera frame.
+	// Publish live detections only; remembered obstacles are represented by /line_points.
 	try {
 		if (!depth_line_points.empty()) {
-			std::vector<std::array<float, 3>> transformed_pc_vec;
-			transformed_pc_vec.reserve(depth_line_points.size());
-			for (const auto & p : depth_line_points) {
-				transformed_pc_vec.push_back(
-					{static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z())});
-			}
-			sensor_msgs::msg::PointCloud2 pc =
-				createPointCloud(transformed_pc_vec, target_frame_, depth_msg->header.stamp);
-			_line_point_cloud_pub->publish(pc);
-		} else if (has_last_valid_message_ && !last_valid_message_.points.empty()) {
-			std::vector<std::array<float, 3>> cached_pc_vec;
-			cached_pc_vec.reserve(last_valid_message_.points.size());
-			for (const auto & point : last_valid_message_.points) {
-				cached_pc_vec.push_back(
-					{static_cast<float>(point.x), static_cast<float>(point.y), static_cast<float>(point.z)});
-			}
-			sensor_msgs::msg::PointCloud2 pc = createPointCloud(
-				cached_pc_vec,
-				last_valid_message_.header.frame_id.empty() ? target_frame_ : last_valid_message_.header.frame_id,
-				last_valid_message_.header.stamp);
-			_line_point_cloud_pub->publish(pc);
+			publishLivePointCloud(depth_line_points, depth_msg->header.stamp);
+		} else {
+			publishEmptyPointCloud(depth_msg->header.stamp);
 		}
 	} catch (const std::exception& e) {
 		RCLCPP_ERROR_ONCE(get_logger(), "Pointcloud publish failed: %s", e.what());
@@ -574,6 +619,7 @@ void LineDetectorNode::line_callback()
 	}();
 
 	if (!camera_msg || !depth_msg) {
+		publishHeldOrEmpty("missing camera/depth image");
 		return;
 	}
 	if (!imagesAreSynchronized(camera_msg, depth_msg)) {
@@ -594,11 +640,13 @@ void LineDetectorNode::line_callback()
 		}
 	} catch (cv_bridge::Exception& e) {
 		RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
+		publishHeldOrEmpty("cv_bridge exception");
 		return;
 	}
 	
 	if (cv_ptr->image.empty() || cv_ptr->image.type() != CV_8UC1) {
 		RCLCPP_ERROR(this->get_logger(), "Invalid image after conversion");
+		publishHeldOrEmpty("invalid grayscale image");
 		return;
 	}
 
@@ -608,6 +656,7 @@ void LineDetectorNode::line_callback()
 		line_pair = lines::detect_line_pixels(cv_ptr->image);
 	} catch (const std::exception& e) {
 		RCLCPP_ERROR(this->get_logger(), "Line detection failed: %s", e.what());
+		publishHeldOrEmpty("line detection failure");
 		return;
 	}
 	

@@ -144,6 +144,10 @@ void LineLayer::linePointCallback(autonav_interfaces::msg::LinePoints::ConstShar
 std::optional<std::vector<geometry_msgs::msg::Vector3>> LineLayer::transformPointsToGlobalFrame(
   const autonav_interfaces::msg::LinePoints & message)
 {
+  auto node = node_.lock();
+  if (!node) {
+    return std::nullopt;
+  }
   const std::string target_frame = layered_costmap_->getGlobalFrameID();
   std::vector<geometry_msgs::msg::Vector3> transformed_points;
   transformed_points.reserve(message.points.size());
@@ -153,15 +157,25 @@ std::optional<std::vector<geometry_msgs::msg::Vector3>> LineLayer::transformPoin
   }
 
   geometry_msgs::msg::TransformStamped transform;
+  const bool use_latest_transform =
+    message.header.frame_id == "map" && target_frame == "odom";
   try {
-    transform = tf_buffer_->lookupTransform(
-      target_frame,
-      message.header.frame_id,
-      rclcpp::Time(message.header.stamp),
-      rclcpp::Duration::from_seconds(transform_tolerance_));
+    if (use_latest_transform) {
+      transform = tf_buffer_->lookupTransform(
+        target_frame,
+        message.header.frame_id,
+        rclcpp::Time(0, 0, node->get_clock()->get_clock_type()),
+        rclcpp::Duration::from_seconds(transform_tolerance_));
+    } else {
+      transform = tf_buffer_->lookupTransform(
+        target_frame,
+        message.header.frame_id,
+        rclcpp::Time(message.header.stamp),
+        rclcpp::Duration::from_seconds(transform_tolerance_));
+    }
   } catch (const tf2::TransformException & ex) {
     RCLCPP_WARN_THROTTLE(
-      rclcpp::get_logger("nav_costmap_2d"), *node_.lock()->get_clock(), 3000,
+      rclcpp::get_logger("nav_costmap_2d"), *node->get_clock(), 3000,
       "line_layer TF unavailable (%s <- %s): %s",
       target_frame.c_str(), message.header.frame_id.c_str(), ex.what());
     return std::nullopt;

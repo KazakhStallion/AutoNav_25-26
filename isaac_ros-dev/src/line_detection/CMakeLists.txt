@@ -16,6 +16,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(image_geometry REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
 # ---- CUDA Toolchain (modern) ----
@@ -60,6 +61,7 @@ ament_target_dependencies(line_detector
   tf2_eigen
   Eigen3
   image_geometry
+  std_srvs
   tf2_geometry_msgs
 )
 
