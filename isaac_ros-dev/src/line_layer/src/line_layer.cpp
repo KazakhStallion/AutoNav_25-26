@@ -302,12 +302,22 @@ LineLayer::updateBounds(
   double robot_x, double robot_y, double /*robot_yaw*/, double * min_x,
   double * min_y, double * max_x, double * max_y)
 {
+  if (!rolling_window_) {
+    last_min_x_ = origin_x_;
+    last_min_y_ = origin_y_;
+    last_max_x_ = origin_x_ + getSizeInMetersX();
+    last_max_y_ = origin_y_ + getSizeInMetersY();
+    *min_x = std::min(*min_x, last_min_x_);
+    *min_y = std::min(*min_y, last_min_y_);
+    *max_x = std::max(*max_x, last_max_x_);
+    *max_y = std::max(*max_y, last_max_y_);
+    need_recalculation_ = false;
+    return;
+  }
+
   if (need_recalculation_) {
     
-    if (rolling_window_) {
-
-      updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
-    }
+    updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
 
     
 
