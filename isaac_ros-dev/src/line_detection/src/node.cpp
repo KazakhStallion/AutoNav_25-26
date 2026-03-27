@@ -37,7 +37,7 @@ public:
 		this->declare_parameter("publish_interval_ms", 250);
 		this->declare_parameter("max_rgb_depth_delta_ms", 120);
 		this->declare_parameter("tf_lookup_timeout_ms", 100);
-		this->declare_parameter("line_hold_timeout_ms", 750);
+		this->declare_parameter("line_hold_timeout_ms", 5000);
 		
 		std::string camera_topic = this->get_parameter("camera_topic").as_string();
 		std::string depth_camera_topic = this->get_parameter("depth_camera_topic").as_string();
@@ -131,7 +131,7 @@ private:
 	int64_t publish_interval_ms_ = 250;
 	int64_t max_rgb_depth_delta_ms_ = 120;
 	int64_t tf_lookup_timeout_ms_ = 100;
-	int64_t line_hold_timeout_ms_ = 750;
+	int64_t line_hold_timeout_ms_ = 5000;
 	autonav_interfaces::msg::LinePoints last_valid_message_;
 	rclcpp::Time last_valid_detection_time_{0, 0, RCL_ROS_TIME};
 	bool has_last_valid_message_ = false;
