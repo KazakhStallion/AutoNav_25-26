@@ -194,9 +194,10 @@ global_costmap:
       use_sim_time: False
       robot_radius: 0.41
       resolution: 0.05
+      # When static_layer is enabled, the incoming SLAM map defines the global costmap geometry.
+      # Therefore, the following width, height, and origin are not used
       width: 50
       height: 50
-      # Center the fixed global costmap around the robot's startup area
       origin_x: -25.0
       origin_y: -25.0
       track_unknown_space: true
