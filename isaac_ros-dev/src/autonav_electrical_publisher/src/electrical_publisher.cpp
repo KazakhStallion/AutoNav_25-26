@@ -46,8 +46,42 @@ private:
     // ================================================================
     // I2C polling callback - runs at fixed rate (loop_rate_hz_)
     // ================================================================
+    void try_init_ina226() {
+        // Try to open I2C if not already open
+        if (i2c_fd_ < 0) {
+            if (!open_i2c("/dev/i2c-7", 0x40)) {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                    "INA226 I2C init retry failed — will keep trying");
+                return;
+            }
+        }
+
+        // Try calibration write
+        uint8_t calib_buf[3] = {0x05, 0x08, 0x00};
+        if (write(i2c_fd_, calib_buf, sizeof(calib_buf)) != sizeof(calib_buf)) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                "INA226 calibration write retry failed — will keep trying");
+            return;
+        }
+
+        // Verify calibration readback
+        uint8_t reg = 0x05;
+        uint8_t read_buf[2];
+        if (write(i2c_fd_, &reg, 1) == 1 &&
+            read(i2c_fd_, read_buf, 2) == 2 &&
+            read_buf[0] == 0x08 &&
+            read_buf[1] == 0x00) {
+            chip_ready_ = true;
+            RCLCPP_INFO(this->get_logger(), "INA226 calibrated and ready (CAL=2048)");
+        } else {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                "INA226 calibration readback retry failed — will keep trying");
+        }
+    }
+
     void i2c_timer_callback() {
         if (!chip_ready_) {
+            try_init_ina226();
             return;
         }
 
@@ -171,35 +205,33 @@ public:
         //
         // Step 1: Open I2C bus and set slave address to 0x40 (if not already open)
             if (!open_i2c("/dev/i2c-7", 0x40)) {
-                RCLCPP_ERROR(this->get_logger(), "I2C init failed");
-                return;
-            }   
-
+                RCLCPP_WARN(this->get_logger(), "I2C init failed — will retry in timer");
+            } else {
         //
         // Step 2: Write the register address to set the pointer
-            // Write INA226 calibration register (0x05) with CAL = 2048 (0x0800)
-            // CAL = 0.00512 / (CURRENT_LSB * R_SHUNT) = 0.00512 / (0.00025 * 0.010) = 2048
-            uint8_t calib_buf[3] = {0x05, 0x08, 0x00};
-            if (write(i2c_fd_, calib_buf, sizeof(calib_buf)) != sizeof(calib_buf)) {
-                RCLCPP_ERROR(this->get_logger(), "Calibration write failed");
-                return;
-            }
-
+                // Write INA226 calibration register (0x05) with CAL = 2048 (0x0800)
+                // CAL = 0.00512 / (CURRENT_LSB * R_SHUNT) = 0.00512 / (0.00025 * 0.010) = 2048
+                uint8_t calib_buf[3] = {0x05, 0x08, 0x00};
+                if (write(i2c_fd_, calib_buf, sizeof(calib_buf)) != sizeof(calib_buf)) {
+                    RCLCPP_WARN(this->get_logger(), "Calibration write failed — will retry in timer");
+                } else {
         // Step 3: Read back calibration register to verify
-            uint8_t reg = 0x05;
-            uint8_t read_buf[2];
+                    uint8_t reg = 0x05;
+                    uint8_t read_buf[2];
 
-            if (write(i2c_fd_, &reg, 1) == 1 &&
-              read(i2c_fd_, read_buf, 2) == 2 &&
-              read_buf[0] == 0x08 &&
-              read_buf[1] == 0x00) {
+                    if (write(i2c_fd_, &reg, 1) == 1 &&
+                      read(i2c_fd_, read_buf, 2) == 2 &&
+                      read_buf[0] == 0x08 &&
+                      read_buf[1] == 0x00) {
 
-              chip_ready_ = true;
-              RCLCPP_INFO(this->get_logger(), "INA226 calibrated and ready (CAL=2048)");
-            } else {
-              RCLCPP_ERROR(this->get_logger(),
-                "INA226 calibration readback failed (got 0x%02X%02X, expected 0x0800)",
-                read_buf[0], read_buf[1]);
+                      chip_ready_ = true;
+                      RCLCPP_INFO(this->get_logger(), "INA226 calibrated and ready (CAL=2048)");
+                    } else {
+                      RCLCPP_WARN(this->get_logger(),
+                        "INA226 calibration readback failed (got 0x%02X%02X, expected 0x0800) — will retry in timer",
+                        read_buf[0], read_buf[1]);
+                    }
+                }
             }
         
         // ================================================================
