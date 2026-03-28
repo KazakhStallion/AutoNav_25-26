@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -14,6 +15,7 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
+#include <mutex>
 
 /**
  * @brief Data Publisher Node for Automated Testing
@@ -43,15 +45,21 @@ private:
     bool collecting_data_;
     bool estop_triggered_;
     std::string test_id_;
-    
-    // Data storage
-    std::string gps_data_;
-    std::string odom_data_;
-    std::string cmd_vel_data_;
-    std::string encoder_data_;
-    std::string imu_data_;
-    std::string scan_data_;
-    std::string lines_data_;
+
+    // Mutex to protect shared data from race conditions
+    std::mutex data_mutex_;
+
+    // Latest data storage
+    std::string latest_gps_data_;
+    std::string latest_odom_data_;
+    std::string latest_cmd_vel_data_;
+    std::string latest_encoder_data_;
+    std::string latest_imu_data_;
+    std::string latest_scan_data_;
+    std::string latest_lines_data_;
+    std::string latest_voltage_data_;
+    std::string latest_current_data_;
+    std::string latest_power_data_;
     
     // Generic subscribers - will be created dynamically based on topics_to_monitor
     std::vector<rclcpp::SubscriptionBase::SharedPtr> dynamic_subscribers_;
@@ -106,7 +114,8 @@ private:
                     std::stringstream ss;
                     ss << std::fixed << std::setprecision(8)
                        << msg->latitude << "," << msg->longitude << "," << msg->altitude;
-                    gps_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_gps_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -125,7 +134,8 @@ private:
                        << msg->orientation.x << ","
                        << msg->orientation.y << ","
                        << msg->orientation.z;
-                    imu_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_imu_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -136,7 +146,8 @@ private:
                     std::stringstream ss;
                     ss << std::fixed << std::setprecision(3)
                        << msg->range_min << "," << msg->range_max << "," << msg->ranges.size();
-                    scan_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_scan_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -149,7 +160,8 @@ private:
                        << msg->pose.pose.position.x << ","
                        << msg->pose.pose.position.y << ","
                        << msg->pose.pose.orientation.z;
-                    odom_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_odom_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -160,7 +172,8 @@ private:
                     std::stringstream ss;
                     ss << std::fixed << std::setprecision(3)
                        << msg->linear.x << "," << msg->angular.z;
-                    cmd_vel_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_cmd_vel_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
@@ -170,20 +183,53 @@ private:
                 [this](const autonav_interfaces::msg::Encoders::SharedPtr msg) {
                     std::stringstream ss;
                     ss << msg->left_motor_count << "," << msg->right_motor_count;
-                    encoder_data_ = ss.str();
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_encoder_data_ = ss.str();
                 });
             dynamic_subscribers_.push_back(sub);
         }
         else if (topic == "/line_detection/lines") {
-            // Fallback: if line detection publishes String payloads
             auto sub = this->create_subscription<std_msgs::msg::String>(
                 topic, 10,
                 [this](const std_msgs::msg::String::SharedPtr msg) {
-                    lines_data_ = msg->data;
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_lines_data_ = msg->data;
                 });
             dynamic_subscribers_.push_back(sub);
         }
-        // Add more topic types as needed
+        else if (topic == "/electrical/voltage") {
+            auto sub = this->create_subscription<std_msgs::msg::Float32>(
+                topic, 10,
+                [this](const std_msgs::msg::Float32::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(3) << msg->data;
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_voltage_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/electrical/current") {
+            auto sub = this->create_subscription<std_msgs::msg::Float32>(
+                topic, 10,
+                [this](const std_msgs::msg::Float32::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(3) << msg->data;
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_current_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
+        else if (topic == "/electrical/power") {
+            auto sub = this->create_subscription<std_msgs::msg::Float32>(
+                topic, 10,
+                [this](const std_msgs::msg::Float32::SharedPtr msg) {
+                    std::stringstream ss;
+                    ss << std::fixed << std::setprecision(3) << msg->data;
+                    std::lock_guard<std::mutex> lock(data_mutex_);
+                    latest_power_data_ = ss.str();
+                });
+            dynamic_subscribers_.push_back(sub);
+        }
     }
 
     void toggle_callback(const std_msgs::msg::Bool::SharedPtr msg) {
@@ -191,13 +237,17 @@ private:
         if (collecting_data_) {
             RCLCPP_INFO(this->get_logger(), "Data collection ENABLED");
             // Clear previous data
-            gps_data_.clear();
-            odom_data_.clear();
-            cmd_vel_data_.clear();
-            encoder_data_.clear();
-            imu_data_.clear();
-            scan_data_.clear();
-            lines_data_.clear();
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            latest_gps_data_.clear();
+            latest_odom_data_.clear();
+            latest_cmd_vel_data_.clear();
+            latest_encoder_data_.clear();
+            latest_imu_data_.clear();
+            latest_scan_data_.clear();
+            latest_lines_data_.clear();
+            latest_voltage_data_.clear();
+            latest_current_data_.clear();
+            latest_power_data_.clear();
         } else {
             RCLCPP_INFO(this->get_logger(), "Data collection DISABLED");
         }
@@ -223,74 +273,113 @@ private:
         if (!collecting_data_ || estop_triggered_) {
             return;
         }
-        
+
         // Publish data for each topic separately in the format expected by base_automator:
         // "topic_name,data_type,data_values"
-        
-        
+
         auto msg = std_msgs::msg::String();
         static int debug_count = 0;
-        
+
+        // Make local copies of data with mutex protection
+        std::string gps_data, imu_data, scan_data, odom_data, cmd_vel_data,
+                    encoder_data, lines_data, voltage_data, current_data, power_data;
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            gps_data = latest_gps_data_;
+            imu_data = latest_imu_data_;
+            scan_data = latest_scan_data_;
+            odom_data = latest_odom_data_;
+            cmd_vel_data = latest_cmd_vel_data_;
+            encoder_data = latest_encoder_data_;
+            lines_data = latest_lines_data_;
+            voltage_data = latest_voltage_data_;
+            current_data = latest_current_data_;
+            power_data = latest_power_data_;
+        }
+
         // Publish GPS data
-        if (!gps_data_.empty()) {
-            msg.data = "/gps_fix,NavSatFix," + gps_data_;
+        if (!gps_data.empty()) {
+            msg.data = "/gps_fix,NavSatFix," + gps_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing GPS: %s", msg.data.c_str());
             }
         }
         // Publish IMU data
-        if (!imu_data_.empty()) {
-            msg.data = "/zed/zed_node/imu/data,Imu," + imu_data_;
+        if (!imu_data.empty()) {
+            msg.data = "/zed/zed_node/imu/data,Imu," + imu_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing IMU: %s", msg.data.c_str());
             }
         }
         // Publish LaserScan data summary
-        if (!scan_data_.empty()) {
-            msg.data = "/scan,LaserScan," + scan_data_;
+        if (!scan_data.empty()) {
+            msg.data = "/scan,LaserScan," + scan_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing Scan: %s", msg.data.c_str());
             }
         }
-        
+
         // Publish Odometry data
-        if (!odom_data_.empty()) {
-            msg.data = "/odom,Odometry," + odom_data_;
+        if (!odom_data.empty()) {
+            msg.data = "/odom,Odometry," + odom_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing Odom: %s", msg.data.c_str());
             }
         }
-        
+
         // Publish cmd_vel data
-        if (!cmd_vel_data_.empty()) {
-            msg.data = "/cmd_vel,Twist," + cmd_vel_data_;
+        if (!cmd_vel_data.empty()) {
+            msg.data = "/cmd_vel,Twist," + cmd_vel_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing cmd_vel: %s", msg.data.c_str());
             }
         }
-        
+
         // Publish encoder data
-        if (!encoder_data_.empty()) {
-            msg.data = "/encoders,String," + encoder_data_;
+        if (!encoder_data.empty()) {
+            msg.data = "/encoders,String," + encoder_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing encoders: %s", msg.data.c_str());
             }
         }
         // Publish line detection data if available
-        if (!lines_data_.empty()) {
-            msg.data = "/line_detection/lines,String," + lines_data_;
+        if (!lines_data.empty()) {
+            msg.data = "/line_detection/lines,String," + lines_data;
             data_dump_pub_->publish(msg);
             if (debug_count < 3) {
                 RCLCPP_INFO(this->get_logger(), "Publishing lines: %s", msg.data.c_str());
             }
         }
-        
+
+        // Publish electrical data
+        if (!voltage_data.empty()) {
+            msg.data = "/electrical/voltage,Float32," + voltage_data;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing voltage: %s", msg.data.c_str());
+            }
+        }
+        if (!current_data.empty()) {
+            msg.data = "/electrical/current,Float32," + current_data;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing current: %s", msg.data.c_str());
+            }
+        }
+        if (!power_data.empty()) {
+            msg.data = "/electrical/power,Float32," + power_data;
+            data_dump_pub_->publish(msg);
+            if (debug_count < 3) {
+                RCLCPP_INFO(this->get_logger(), "Publishing power: %s", msg.data.c_str());
+            }
+        }
+
         debug_count++;
     }
 };

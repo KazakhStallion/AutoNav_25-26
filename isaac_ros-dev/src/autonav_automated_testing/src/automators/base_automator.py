@@ -68,7 +68,10 @@ class BaseAutomator(Node):
             '/cmd_vel': 'linear_x,angular_z',
             '/zed/zed_node/imu/data': 'accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,orient_x,orient_y,orient_z',
             '/scan': 'range_min,range_max,ranges_count',
-            '/line_detection/lines': 'lines_detected'
+            '/line_detection/lines': 'lines_detected',
+            '/electrical/voltage': 'voltage_V',
+            '/electrical/current': 'current_A',
+            '/electrical/power': 'power_W'
         }
         
         self.get_logger().info(f'{self.test_id} Automater initialized')
@@ -236,9 +239,30 @@ class BaseAutomator(Node):
                 # Line detection data
                 if len(data_values) >= 1:
                     formatted_rows.append([
-                        ros_timestamp, 
-                        topic_name, 
+                        ros_timestamp,
+                        topic_name,
                         "lines_detected"
+                    ] + data_values[0:1])
+            elif topic_name == "/electrical/voltage":
+                if len(data_values) >= 1:
+                    formatted_rows.append([
+                        ros_timestamp,
+                        topic_name,
+                        "voltage_V"
+                    ] + data_values[0:1])
+            elif topic_name == "/electrical/current":
+                if len(data_values) >= 1:
+                    formatted_rows.append([
+                        ros_timestamp,
+                        topic_name,
+                        "current_A"
+                    ] + data_values[0:1])
+            elif topic_name == "/electrical/power":
+                if len(data_values) >= 1:
+                    formatted_rows.append([
+                        ros_timestamp,
+                        topic_name,
+                        "power_W"
                     ] + data_values[0:1])
             else:
                 # Generic format for unknown topics
