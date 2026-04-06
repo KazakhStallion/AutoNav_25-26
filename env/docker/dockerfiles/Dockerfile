@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python3 -m pip install --no-cache-dir pyserial
 
+RUN chmod -R a+rX /usr/local/zed || true
+
 RUN rm -rf /autonav/isaac_ros-dev/install \
            /autonav/isaac_ros-dev/build \
            /autonav/isaac_ros-dev/log
