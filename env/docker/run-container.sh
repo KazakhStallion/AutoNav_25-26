@@ -146,7 +146,12 @@ attach_shell() {
     )
 
     if (($# == 0)); then
-        "${exec_args[@]}" /bin/bash -i
+        "${exec_args[@]}" /bin/bash -lc \
+            "source /opt/ros/humble/setup.bash && \
+             if [ -f /autonav/isaac_ros-dev/install/setup.bash ]; then \
+                 source /autonav/isaac_ros-dev/install/setup.bash; \
+             fi && \
+             exec /bin/bash -i"
     else
         "${exec_args[@]}" /bin/bash "$@"
     fi
