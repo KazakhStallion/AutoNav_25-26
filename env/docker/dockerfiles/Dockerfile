@@ -9,12 +9,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     evtest \
     joystick \
     ros-humble-robot-localization \
+    ros-humble-zed-msgs \
     udev \
     nano \
     iproute2 \
  && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --no-cache-dir pyserial
+
+ENV CMAKE_PREFIX_PATH=/usr/local/zed:${CMAKE_PREFIX_PATH} \
+    CPATH=/usr/local/zed/include:${CPATH} \
+    CPLUS_INCLUDE_PATH=/usr/local/zed/include:${CPLUS_INCLUDE_PATH}
 
 RUN chmod -R a+rX /usr/local/zed || true
 

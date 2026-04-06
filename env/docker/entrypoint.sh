@@ -78,6 +78,13 @@ fi
 # Change to workdir
 cd "${WORKDIR}/isaac_ros-dev" 2>/dev/null || cd "${WORKDIR}" 2>/dev/null || true
 
+# Repair ownership on persisted colcon volumes so non-root builds work.
+for dir in build install log; do
+  if [ -e "${dir}" ]; then
+    chown -R "${HOST_USER_UID}:${HOST_USER_GID}" "${dir}" || true
+  fi
+done
+
 # Ensure workspace setup is sourced once for interactive shells.
 if [ -f "${WORKDIR}/isaac_ros-dev/install/setup.bash" ] && [ -f "/home/${USERNAME}/.bashrc" ]; then
   if ! grep -q "source ${WORKDIR}/isaac_ros-dev/install/setup.bash" "/home/${USERNAME}/.bashrc"; then
