@@ -36,7 +36,7 @@ if [ "${PREVIOUS_INIT_STATE}" != "${CURRENT_INIT_STATE}" ]; then
   fi
 
   chown "${USERNAME}:${USERNAME}" "/home/${USERNAME}"
-  echo "${USERNAME} ALL=\(root\) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}"
+  echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}"
   chmod 0440 "/etc/sudoers.d/${USERNAME}"
   adduser "${USERNAME}" video >/dev/null
   adduser "${USERNAME}" plugdev >/dev/null
