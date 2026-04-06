@@ -13,7 +13,13 @@ fi
 # Rebuild only the dev layer
 if docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
   echo "Image $IMAGE_REF exists. Removing it..."
-  docker rmi "$IMAGE_REF"
+  if ! docker rmi "$IMAGE_REF"; then
+    echo
+    echo "Failed to remove $IMAGE_REF because a container still references it."
+    echo "Run: docker ps -a --filter ancestor=$IMAGE_REF"
+    echo "Then remove the container shown above and rerun this script."
+    exit 1
+  fi
 fi
 
 # Build the dev image
