@@ -17,9 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python3 -m pip install --no-cache-dir pyserial
 
-ENV CMAKE_PREFIX_PATH=/usr/local/zed:${CMAKE_PREFIX_PATH} \
-    CPATH=/usr/local/zed/include:${CPATH} \
-    CPLUS_INCLUDE_PATH=/usr/local/zed/include:${CPLUS_INCLUDE_PATH}
+ENV CMAKE_PREFIX_PATH=/usr/local/zed \
+    CPATH=/usr/local/zed/include \
+    CPLUS_INCLUDE_PATH=/usr/local/zed/include
+
+RUN mkdir -p /usr/local/zed/lib/cmake/ZED && \
+    ln -sfn /usr/local/zed/lib /usr/local/zed/lib/cmake/ZED/lib
 
 RUN chmod -R a+rX /usr/local/zed || true
 
