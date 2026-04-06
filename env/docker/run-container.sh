@@ -137,6 +137,8 @@ attach_shell() {
     _refresh_x11_auth
     docker exec -i -t -u "${USERNAME}" \
         -e "DISPLAY=${DISPLAY}" \
+        -e "HOME=/home/${USERNAME}" \
+        -e "USER=${USERNAME}" \
         -e "XAUTHORITY=${XAUTH_FILE}" \
         --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" \
         "${CONTAINER_NAME}" /bin/bash "$@"
