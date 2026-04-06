@@ -135,13 +135,21 @@ if [[ -n "$INPUT_GID" ]]; then DOCKER_ARGS+=("--group-add=${INPUT_GID}"); fi
 attach_shell() {
     # Refresh X11 auth cookie for the current SSH session's display
     _refresh_x11_auth
-    docker exec -i -t -u "${USERNAME}" \
-        -e "DISPLAY=${DISPLAY}" \
-        -e "HOME=/home/${USERNAME}" \
-        -e "USER=${USERNAME}" \
-        -e "XAUTHORITY=${XAUTH_FILE}" \
-        --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev" \
-        "${CONTAINER_NAME}" /bin/bash "$@"
+    local exec_args=(
+        docker exec -i -t -u "${USERNAME}"
+        -e "DISPLAY=${DISPLAY}"
+        -e "HOME=/home/${USERNAME}"
+        -e "USER=${USERNAME}"
+        -e "XAUTHORITY=${XAUTH_FILE}"
+        --workdir "${CONTAINER_WORKDIR}/isaac_ros-dev"
+        "${CONTAINER_NAME}"
+    )
+
+    if (($# == 0)); then
+        "${exec_args[@]}" /bin/bash -i
+    else
+        "${exec_args[@]}" /bin/bash "$@"
+    fi
 }
 
 wait_for_container_user() {
