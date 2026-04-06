@@ -36,9 +36,12 @@ DOCKER_ARGS+=("--network=host")
 # DISPLAY FORWARDING
 # Generate a wildcard xauth cookie so X11 auth works inside the container
 # regardless of hostname differences between host and container.
-XAUTH_FILE="/tmp/.docker-xauth-${CONTAINER_NAME}"
+XAUTH_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+mkdir -p "${XAUTH_DIR}"
+XAUTH_FILE="${XAUTH_DIR}/.docker-xauth-${CONTAINER_NAME}"
 _refresh_x11_auth() {
-    touch "${XAUTH_FILE}" && chmod 644 "${XAUTH_FILE}"
+    touch "${XAUTH_FILE}" 2>/dev/null || return 0
+    chmod 644 "${XAUTH_FILE}" 2>/dev/null || true
     if [[ -n "${DISPLAY}" ]]; then
         xauth nlist "${DISPLAY}" 2>/dev/null \
             | sed -e 's/^..../ffff/' \
@@ -139,9 +142,27 @@ attach_shell() {
         "${CONTAINER_NAME}" /bin/bash "$@"
 }
 
+wait_for_container_user() {
+    local tries=30
+
+    while ((tries > 0)); do
+        if docker exec "${CONTAINER_NAME}" getent passwd "${USERNAME}" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        ((tries--))
+    done
+
+    echo "Timed out waiting for user ${USERNAME} to be created in ${CONTAINER_NAME}."
+    echo "Container logs:"
+    docker logs "${CONTAINER_NAME}" || true
+    return 1
+}
+
 # RE-USE EXISTING CONTAINER
 if [ "$(docker ps -a --quiet --filter status=running --filter name=^/${CONTAINER_NAME}$)" ]; then
     echo "Container $CONTAINER_NAME is already running. Attaching..."
+    wait_for_container_user
     attach_shell "$@"
     exit 0
 fi
@@ -150,6 +171,7 @@ fi
 if [ "$(docker ps -a --quiet --filter status=exited --filter name=^/${CONTAINER_NAME}$)" ]; then
     echo "Container $CONTAINER_NAME exists but is stopped. Starting and attaching..."
     docker start "$CONTAINER_NAME" >/dev/null
+    wait_for_container_user
     attach_shell "$@"
     exit 0
 fi
@@ -172,4 +194,5 @@ docker run -d \
     $IMAGE_TAG \
     sleep infinity >/dev/null
 
+wait_for_container_user
 attach_shell "$@"
