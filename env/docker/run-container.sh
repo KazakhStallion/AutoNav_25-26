@@ -117,11 +117,12 @@ DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log
 # /usr/local/zed/lib/cmake/ZED/settings/ inside the (read-only) image
 # and fails with "Permission denied" / "CALIBRATION FILE NOT AVAILABLE".
 mkdir -p "$HOME/zed/settings" "$HOME/zed/resources"
-# Legacy path (ZED SDK < 5)
+# Legacy paths (ZED SDK < 5)
 DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/settings")
-# ZED SDK 5.x calibration directory
-DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/lib/cmake/ZED/settings")
 DOCKER_ARGS+=("-v" "$HOME/zed/resources:/usr/local/zed/resources")
+# ZED SDK 5.x paths (calibration + AI models e.g. neural_depth_light_5.2.model)
+DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/lib/cmake/ZED/settings")
+DOCKER_ARGS+=("-v" "$HOME/zed/resources:/usr/local/zed/lib/cmake/ZED/resources")
 
 DOCKER_ARGS+=("--entrypoint=$ENTRYPOINT")
 
