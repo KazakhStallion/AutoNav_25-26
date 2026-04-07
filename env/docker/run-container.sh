@@ -111,12 +111,17 @@ DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-build:${CONTAINER_WORKDIR}/isaac_ros-dev/b
 DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-install:${CONTAINER_WORKDIR}/isaac_ros-dev/install")
 DOCKER_ARGS+=("-v" "${CONTAINER_NAME}-log:${CONTAINER_WORKDIR}/isaac_ros-dev/log")
 # ZED settings/resources
-if [[ -d "$HOME/zed/settings" ]]; then
-    DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/settings")
-fi
-if [[ -d "$HOME/zed/resources" ]]; then
-    DOCKER_ARGS+=("-v" "$HOME/zed/resources:/usr/local/zed/resources")
-fi
+# Ensure host dirs exist so the SDK can always download and persist
+# factory calibration files (e.g. SN<serial>.conf) across container runs.
+# Without the SDK-5.x path mount, ZED tries to create
+# /usr/local/zed/lib/cmake/ZED/settings/ inside the (read-only) image
+# and fails with "Permission denied" / "CALIBRATION FILE NOT AVAILABLE".
+mkdir -p "$HOME/zed/settings" "$HOME/zed/resources"
+# Legacy path (ZED SDK < 5)
+DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/settings")
+# ZED SDK 5.x calibration directory
+DOCKER_ARGS+=("-v" "$HOME/zed/settings:/usr/local/zed/lib/cmake/ZED/settings")
+DOCKER_ARGS+=("-v" "$HOME/zed/resources:/usr/local/zed/resources")
 
 DOCKER_ARGS+=("--entrypoint=$ENTRYPOINT")
 
