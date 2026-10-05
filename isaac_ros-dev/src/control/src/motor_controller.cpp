@@ -81,9 +81,14 @@ void MotorController::turnRight(){
 
 // moves the robot at specific motor speeds
 void MotorController::move(float right_speed, float left_speed){
-  
-    int leftMotorSpeed = (int)(stepSize * left_speed);
-    int rightMotorSpeed = (int)(-stepSize * right_speed);
+
+    // Signs flipped 2026-10-05: after re-running the Roborun+ Motor Sensor
+    // Setup (hall wiring fix), a positive !G on channel 1 / negative on
+    // channel 2 drove the robot BACKWARD. Hall/encoder counts still follow
+    // physical rotation, so odometry needed no change. If the Roboteq motor
+    // setup is ever re-run, re-check direction: sticks up must drive forward.
+    int leftMotorSpeed = (int)(-stepSize * left_speed);
+    int rightMotorSpeed = (int)(stepSize * right_speed);
 
     std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
     std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";

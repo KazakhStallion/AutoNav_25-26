@@ -145,7 +145,7 @@ controller_server:
       vx_std: 0.35
       vy_std: 0.01
       wz_std: 0.70
-      vx_max: 1.00
+      vx_max: 0.50   # was 1.00; lowered for first autonomy test after motor rework (2026-10-05)
       vx_min: 0.04
       vy_max: 0.0
       wz_max: 1.0
@@ -694,7 +694,7 @@ velocity_smoother:
     # Requested regular AutoNav speed: 0.85 m/s. This is above the last
     # documented 0.50 m/s outdoor validation, so bag-test it for MPPI
     # chatter, obstacle clearance, and command gaps before competition use.
-    max_velocity: [0.85, 0.0, 1.0]
+    max_velocity: [0.50, 0.0, 1.0]   # was 0.85; first autonomy test after motor rework (2026-10-05)
     min_velocity: [-0.25, 0.0, -1.0]
     # Dampen yaw-rate step changes. The previous +/-3.2 rad/s^2 limit could
     # snap to the requested turn rate in ~0.3 s, which made path corrections

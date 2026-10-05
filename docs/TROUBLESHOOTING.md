@@ -972,6 +972,16 @@ Every bug fix mined from git history (15 parallel research agents), sorted by da
 - **Triage tip**: If yaw tracking misbehaves, first confirm `imu_cov_inflator` is running and publishing on `/sick_scansegment_xd/imu_inflated` (`ros2 topic hz`). Then confirm `ekf_local.yaml`'s `imu0` is pointed at the inflated topic, **not** the raw one. The `imu_frame_transformer.py` no longer exists — do not re-add it without coordinating, since the inflator-based design assumes the frame mismatch is handled by trust-weighting rather than transformation.
 - **Keywords**: imu, sick-imu, yaw, yaw-inverted, imu_cov_inflator, imu_inflated, ekf_local, ekf_local.yaml, lidar_footprint, base_link, sick_scansegment_xd, upside-down, lidar-mount, urdf, π-roll, covariance-inflation, superseded
 
+## 2026-10-05 — Robot won't drive: SBS wait mode, crossed hall rows, reversed motor direction
+
+- **Symptoms**: Roboteq red LED, `?FF=64` (MOSFET failure) latched at every power-up and returned after `%RESET`; same on both controllers. Later: wheels locked/stalled at 7–16 A with hall state not changing; after that fix, autonomous drove backward and Nav2 steering oscillated.
+- **Cause 1**: The Roboteq Safety Brake Switches (SBS1xxyy) sat in Wait mode with motor phases shorted, so the Roboteq's boot MOSFET self-test failed. Their safety inputs (X2 pins 2/6) need 18–60 V from the 24 V terminal.
+- **Cause 2**: Hall signal wires were in the wrong rows of the shared 10-pin hall connector, so each motor was commutated from the other motor's sensors. Fixed by swapping the signal groups between rows, then running Roborun+ Motor Sensor and Tuning Setup on both motors and saving (`%EESAV`).
+- **Cause 3**: After that setup, a positive `!G 1` / negative `!G 2` drove the robot backward. Signs flipped in `MotorController::move()`; hall counts follow physical rotation, so odometry was unaffected.
+- **Still required**: the Roboteq boots before the SBS units release, so it latches `FF=64` on every power-up — `%RESET 321654987` once the SBS CH1/CH2 LEDs are blue. Permanent fix (not done): SBS X2 pins 3/7 → Roboteq STO1/STO2 (pins 15/16) and remove the STO jumper.
+- **Triage tip**: `?FF=64` with phases unplugged → controller. `FF=0` unplugged but 64 connected → SBS/wiring. `!STT` reports the MOSFET self-test (`5` = failed). Turn each wheel by hand and watch `?C` to see which channel its halls report on. If the Roboteq motor setup is ever re-run, re-check that sticks-up drives forward.
+- **Keywords**: roboteq, FF=64, mosfet, sbs, safety-brake-switch, wait-mode, sto, hall, hall-connector, crossed-halls, motor-setup, roborun, HSAT=128, reversed, backward, motor-direction, motor_controller.cpp, eesav
+
 ---
 
 # Keyword index
