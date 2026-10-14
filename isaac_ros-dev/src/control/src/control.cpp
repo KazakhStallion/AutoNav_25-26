@@ -713,8 +713,13 @@ class ControlNode : public rclcpp::Node {
         autonav_interfaces::msg::Encoders encoder_msg;
         encoder_msg.left_motor_rpm = 0;
         encoder_msg.right_motor_rpm = 0;
-        const int left_count_raw = motors.getLeftEncoderCount();
-        const int right_count_raw = motors.getRightEncoderCount();
+        // Both counts negated 2026-10-12: the Roboteq encoders were set to
+        // negative PPR (EPPR -20481) so encoder speed matches command polarity
+        // for closed-loop speed mode, which also inverts the raw ?C counters.
+        // Negating here restores the count convention that wheel_odom_pub and
+        // update_robot_kinematics were validated against (2026-10-05, vs IMU).
+        const int left_count_raw = -motors.getLeftEncoderCount();
+        const int right_count_raw = -motors.getRightEncoderCount();
         encoder_msg.left_motor_count = left_count_raw;
         encoder_msg.right_motor_count = right_count_raw;
         //RCLCPP_INFO(this->get_logger(), "LEC: %s", motors.getLeftEncoderCount());

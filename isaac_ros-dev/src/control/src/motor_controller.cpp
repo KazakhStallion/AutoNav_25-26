@@ -87,11 +87,18 @@ void MotorController::move(float right_speed, float left_speed){
     // channel 2 drove the robot BACKWARD. Hall/encoder counts still follow
     // physical rotation, so odometry needed no change. If the Roboteq motor
     // setup is ever re-run, re-check direction: sticks up must drive forward.
-    int leftMotorSpeed = (int)(-stepSize * left_speed);
-    int rightMotorSpeed = (int)(stepSize * right_speed);
+    //
+    // Channels swapped 2026-10-12: Roboteq channel 1 drives the physical
+    // RIGHT wheel and channel 2 the LEFT (left stick alone turned the right
+    // wheel; encoder 1, read as the right wheel below, tracks channel 1).
+    // Sending left speed to channel 1 inverted every turn, which made Nav2
+    // steer hard left/right. Channel signs keep forward = ch1 negative,
+    // ch2 positive.
+    int rightMotorSpeed = (int)(-stepSize * right_speed);
+    int leftMotorSpeed = (int)(stepSize * left_speed);
 
-    std::string leftMotorCommand = "!G 1 " + std::to_string(leftMotorSpeed) + "\r";
-    std::string rightMotorCommand = "!G 2 " + std::to_string(rightMotorSpeed) + "\r";
+    std::string rightMotorCommand = "!G 1 " + std::to_string(rightMotorSpeed) + "\r";
+    std::string leftMotorCommand = "!G 2 " + std::to_string(leftMotorSpeed) + "\r";
 
     motorSerial.writeString(leftMotorCommand.c_str());
     motorSerial.writeString(rightMotorCommand.c_str());
